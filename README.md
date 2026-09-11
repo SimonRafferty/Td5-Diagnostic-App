@@ -22,6 +22,18 @@ The app isn't on the Google Play Store just yet - I'll upload it there in due co
 
 Because this is a debug build it isn't signed for the Play Store, so that "unknown source" warning is expected and safe to accept.  Once the Play Store version is live you'll be able to install it the usual way.
 
+## On iPhone and iPad
+
+The app is written for Android, but the same code can run on iOS too - with one catch.  Apple's Safari does not support Web Bluetooth (the standard the app uses to talk to the scanner), so it will not connect if you simply open it in Safari.
+
+The work-around is a free Web Bluetooth browser called **Bluefy**, from the App Store:
+
+1. Install Bluefy on your iPhone or iPad.
+2. Host the contents of the `App/www` folder somewhere Bluefy can reach it - GitHub Pages is an easy, free option - and open that address in Bluefy.  (Once I've set up a hosted version I'll link it here so you can skip this step.)
+3. Tap Connect and choose "OBDII", just as you would on Android.
+
+If you'd rather have a proper native iOS app, the project is built with Capacitor, which also targets iOS: on a Mac with Xcode you can run `npx cap add ios` and build it, as the Bluetooth plugin supports iOS as well.  I may add that in due course.
+
 ## What the App Does
 
 There are four simple tabs - swipe left and right to move between them:
@@ -49,3 +61,5 @@ The dongle is an ESP32-S3 plus a simple K-Line interface (an L9637D transceiver 
 **Firmware:** open `Firmware/Td5_Torque/Td5_Torque.ino` in the Arduino IDE, select the **XIAO_ESP32S3** board and upload.  The only extra library you'll need is *EspSoftwareSerial*.
 
 **App:** the app itself is a single, self-contained HTML file (`App/www/index.html`) wrapped up with Capacitor so it can run natively and use the phone's Bluetooth.  To rebuild the APK, run `npm install` in the `App` folder, then `npx cap sync android` and build with Android Studio (or Gradle).
+
+On a fresh clone there is no `local.properties` file - it just tells Gradle where your machine's Android SDK lives, so it is deliberately left out of the repo.  Android Studio creates it for you automatically when you open the `App` folder, or you can add one yourself containing a single line: `sdk.dir=/path/to/your/Android/Sdk`.
