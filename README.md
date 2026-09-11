@@ -57,13 +57,18 @@ There are four simple tabs - swipe left and right to move between them:
 |--------|----------|
 | `Firmware/` | The ESP32-S3 dongle firmware (Arduino).  This is what turns the K-Line interface into a BLE ELM327 that the app - and other OBD2 apps - can talk to. |
 | `App/` | The Android app project (built with Capacitor) used to produce the APK. |
-| `Hardware/` | Gerber files and PCB details for the K-Line interface. |
+| `Hardware/` | The complete dongle design: PCB gerbers, schematic, BOM, pick-and-place, Altium source, and 3D-printable case halves. |
 | [`Td5-Diagnostics-debug.apk`](Td5-Diagnostics-debug.apk) | The ready-to-install Android app. |
 | [`Td5-Diagnostic.html`](Td5-Diagnostic.html) | The whole app as a single, self-contained web page (browser use, or iOS via Bluefy). |
 
 ## The Hardware
 
-The dongle is an ESP32-S3 plus a simple K-Line interface (an L9637D transceiver and a little protection circuitry).  It connects to the Td5 diagnostic line - OBD pin 7, or pin B18 on the ECU.  I'll upload the Gerber files and the rest of the PCB details to the **Hardware** folder shortly, so you can have a board made.
+The dongle is an ESP32-S3 plus a simple K-Line interface (an L9637D transceiver and a little protection circuitry).  It connects to the Td5 diagnostic line - OBD pin 7, or pin B18 on the ECU.  Everything needed to build one is in the [`Hardware`](Hardware) folder:
+
+- **PCB** - send [`Td5_OBD2_Gerber.zip`](Hardware/Td5_OBD2_Gerber.zip) to any board house to have the board made.
+- **Assembly** - [`Td5_OBD2_BOM.csv`](Hardware/Td5_OBD2_BOM.csv) (bill of materials) and [`Td5_OBD2_PickAndPlace.xlsx`](Hardware/Td5_OBD2_PickAndPlace.xlsx).
+- **Design source** - the full [schematic (PDF)](Hardware/Td5_OBD2_Scematic.pdf) and the editable [Altium project](Hardware/Td5_OBD2_Altium.zip).
+- **Enclosure** - two 3D-printable case halves: [left](Hardware/Dongle%203D%20Print%20Shell%20Left.STEP) and [right](Hardware/Dongle%203D%20Print%20Shell%20Right.STEP) (STEP).
 
 ## Building From Source
 
