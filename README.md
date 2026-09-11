@@ -22,17 +22,17 @@ The app isn't on the Google Play Store just yet - I'll upload it there in due co
 
 Because this is a debug build it isn't signed for the Play Store, so that "unknown source" warning is expected and safe to accept.  Once the Play Store version is live you'll be able to install it the usual way.
 
-## On iPhone and iPad
+## Running it in a Web Browser (no APK)
 
-The app is written for Android, but the same code can run on iOS too - with one catch.  Apple's Safari does not support Web Bluetooth (the standard the app uses to talk to the scanner), so it will not connect if you simply open it in Safari.
+The app is also just a web page, so besides the APK it runs in any Chromium browser that supports Web Bluetooth (Chrome or Edge on Android or a PC).  Two ways to use it:
 
-The work-around is a free Web Bluetooth browser called **Bluefy**, from the App Store:
+- **Tap a hosted link.**  Enable GitHub Pages for this repository (Settings -> Pages -> Deploy from a branch -> `main`).  The app is then live at
+  **https://simonrafferty.github.io/Td5-Diagnostic-App/App/www/index.html** - open that on your phone, tap Connect and choose "OBDII".
+- **Open it from a file.**  Download `App/www/index.html` and `App/www/ble-shim.js` into the same folder and open `index.html` in Chrome.  A local `file://` page counts as a secure context, so Web Bluetooth works with no hosting at all.  (The app needs both files: `index.html` plus `ble-shim.js`.)
 
-1. Install Bluefy on your iPhone or iPad.
-2. Host the contents of the `App/www` folder somewhere Bluefy can reach it - GitHub Pages is an easy, free option - and open that address in Bluefy.  (Once I've set up a hosted version I'll link it here so you can skip this step.)
-3. Tap Connect and choose "OBDII", just as you would on Android.
+### iPhone and iPad
 
-If you'd rather have a proper native iOS app, the project is built with Capacitor, which also targets iOS: on a Mac with Xcode you can run `npx cap add ios` and build it, as the Bluetooth plugin supports iOS as well.  I may add that in due course.
+Apple's Safari does not support Web Bluetooth, so it will not connect there.  Install the free **Bluefy** browser from the App Store, open the hosted link above in Bluefy, and Connect to "OBDII".  (Bluefy loads a URL, so on iOS the hosted-link option is the one to use.)  For a proper native iOS app, the Capacitor project can also target iOS (`npx cap add ios`, built in Xcode on a Mac) since the Bluetooth plugin supports iOS as well - I may add that in due course.
 
 ## What the App Does
 

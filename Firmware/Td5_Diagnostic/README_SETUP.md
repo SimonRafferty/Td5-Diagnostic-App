@@ -58,8 +58,8 @@ enable both, but for the keep-internet goal run BLE-only and do **not** join the
 Board: **Seeed XIAO ESP32-S3** (`esp32:esp32:XIAO_ESP32S3`).
 
 ```bash
-arduino-cli compile --fqbn esp32:esp32:XIAO_ESP32S3 Td5_ESPNow_Torque/Td5_Diagnostic
-arduino-cli upload  --fqbn esp32:esp32:XIAO_ESP32S3 -p <PORT> Td5_ESPNow_Torque/Td5_Diagnostic
+arduino-cli compile --fqbn esp32:esp32:XIAO_ESP32S3 Firmware/Td5_Diagnostic
+arduino-cli upload  --fqbn esp32:esp32:XIAO_ESP32S3 -p <PORT> Firmware/Td5_Diagnostic
 ```
 
 Open the serial monitor at **115200** — it prints the SoftAP status and every
