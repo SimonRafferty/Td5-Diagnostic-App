@@ -43,6 +43,14 @@ There are four simple tabs - swipe left and right to move between them:
 - **Live Data** - your chosen parameters, updating live.
 - **Graphs** - up to four auto-scaling charts so you can watch how things move (boost, temperatures, injector balance and so on).
 
+## Screenshots
+
+| Fault Codes | Available Data |
+|:-----------:|:--------------:|
+| ![Fault Codes screen](DTC.jpg) | ![Available Data screen](Available_Data.jpg) |
+| **Live Data** | **Graphs** |
+| ![Live Data screen](Live_Data.jpg) | ![Graphs screen](Graph.jpg) |
+
 ## What's in this Repository
 
 | Folder | Contents |
