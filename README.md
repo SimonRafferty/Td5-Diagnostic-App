@@ -24,15 +24,15 @@ Because this is a debug build it isn't signed for the Play Store, so that "unkno
 
 ## Running it in a Web Browser (no APK)
 
-The app is also just a web page, so besides the APK it runs in any Chromium browser that supports Web Bluetooth (Chrome or Edge on Android or a PC).  Two ways to use it:
+Besides the APK, the whole app is packaged as a single, self-contained web page - [**Td5-Diagnostic.html**](Td5-Diagnostic.html) - so it runs in any Chromium browser with Web Bluetooth (Chrome or Edge on Android or a PC).  Two ways to use it:
 
-- **Tap a hosted link.**  Enable GitHub Pages for this repository (Settings -> Pages -> Deploy from a branch -> `main`).  The app is then live at
-  **https://simonrafferty.github.io/Td5-Diagnostic-App/App/www/index.html** - open that on your phone, tap Connect and choose "OBDII".
-- **Open it from a file.**  Download `App/www/index.html` and `App/www/ble-shim.js` into the same folder and open `index.html` in Chrome.  A local `file://` page counts as a secure context, so Web Bluetooth works with no hosting at all.  (The app needs both files: `index.html` plus `ble-shim.js`.)
+- **Open it from a file.**  Download [Td5-Diagnostic.html](Td5-Diagnostic.html) onto your phone or PC and open it in Chrome.  It's one file with nothing else to fetch, and a local `file://` page counts as a secure context, so Web Bluetooth works with no hosting at all.  Tap Connect and choose "OBDII".
+- **Tap a hosted link.**  Enable GitHub Pages for this repository (Settings -> Pages -> Deploy from a branch -> `main`) and the same page is live at
+  **https://simonrafferty.github.io/Td5-Diagnostic-App/Td5-Diagnostic.html**.
 
 ### iPhone and iPad
 
-Apple's Safari does not support Web Bluetooth, so it will not connect there.  Install the free **Bluefy** browser from the App Store, open the hosted link above in Bluefy, and Connect to "OBDII".  (Bluefy loads a URL, so on iOS the hosted-link option is the one to use.)  For a proper native iOS app, the Capacitor project can also target iOS (`npx cap add ios`, built in Xcode on a Mac) since the Bluetooth plugin supports iOS as well - I may add that in due course.
+Apple's Safari does not support Web Bluetooth, so it will not connect there.  Install the free **Bluefy** browser from the App Store and open the hosted link above in it (Bluefy loads a URL, so on iOS use the GitHub Pages option).  For a proper native iOS app, the Capacitor project can also target iOS (`npx cap add ios`, built in Xcode on a Mac) since the Bluetooth plugin supports iOS as well - I may add that in due course.
 
 ## What the App Does
 
@@ -51,6 +51,7 @@ There are four simple tabs - swipe left and right to move between them:
 | `App/` | The Android app project (built with Capacitor) used to produce the APK. |
 | `Hardware/` | Gerber files and PCB details for the K-Line interface.  I'll add these here myself. |
 | [`Td5-Diagnostics-debug.apk`](Td5-Diagnostics-debug.apk) | The ready-to-install Android app. |
+| [`Td5-Diagnostic.html`](Td5-Diagnostic.html) | The whole app as a single, self-contained web page (browser use, or iOS via Bluefy). |
 
 ## The Hardware
 
@@ -60,6 +61,8 @@ The dongle is an ESP32-S3 plus a simple K-Line interface (an L9637D transceiver 
 
 **Firmware:** open `Firmware/Td5_Diagnostic/Td5_Diagnostic.ino` in the Arduino IDE, select the **XIAO_ESP32S3** board and upload.  The only extra library you'll need is *EspSoftwareSerial*.
 
-**App:** the app itself is a single, self-contained HTML file (`App/www/index.html`) wrapped up with Capacitor so it can run natively and use the phone's Bluetooth.  To rebuild the APK, run `npm install` in the `App` folder, then `npx cap sync android` and build with Android Studio (or Gradle).
+**App:** the app itself is an HTML file (`App/www/index.html`) plus a small Bluetooth bridge (`App/www/ble-shim.js`), wrapped up with Capacitor so it can run natively.  To rebuild the APK, run `npm install` in the `App` folder, then `npx cap sync android` and build with Android Studio (or Gradle).
+
+**Single-file web page:** run `npm run single` in the `App` folder to regenerate `Td5-Diagnostic.html` - it simply inlines `ble-shim.js` into `index.html` to produce the standalone page.
 
 On a fresh clone there is no `local.properties` file - it just tells Gradle where your machine's Android SDK lives, so it is deliberately left out of the repo.  Android Studio creates it for you automatically when you open the `App` folder, or you can add one yourself containing a single line: `sdk.dir=/path/to/your/Android/Sdk`.
