@@ -69,7 +69,7 @@ The dongle is an ESP32-S3 plus a simple K-Line interface (an L9637D transceiver 
 
 **Firmware:** open `Firmware/Td5_Diagnostic/Td5_Diagnostic.ino` in the Arduino IDE, select the **XIAO_ESP32S3** board and upload.  The only extra library you'll need is *EspSoftwareSerial*.
 
-**App:** the app itself is an HTML file (`App/www/index.html`) plus a small Bluetooth bridge (`App/www/ble-shim.js`), wrapped up with Capacitor so it can run natively.  To rebuild the APK, run `npm install` in the `App` folder, then `npx cap sync android` and build with Android Studio (or Gradle).
+**App:** the app itself is an HTML file (`App/www/index.html`) plus a small Bluetooth bridge (`App/www/ble-shim.js`).  The bridge is only used by the **native APK** - an Android WebView has no Web Bluetooth, so the bridge hands BLE to the phone's Bluetooth stack via Capacitor.  To rebuild the APK, run `npm install` in the `App` folder, then `npx cap sync android` and build with Android Studio (or Gradle).
 
-**Single-file web page:** Download [Td5-Diagnostic.html](Td5-Diagnostic.html)
+**Single-file web page:** [Td5-Diagnostic.html](Td5-Diagnostic.html) is generated from `App/www/index.html` with `npm run single` (run in the `App` folder).  It is a browser-only build, so it drops the `ble-shim.js` bridge and uses the browser's built-in Web Bluetooth directly - which keeps it to a single, lightweight file.
 
