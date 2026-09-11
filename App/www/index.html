@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12457e">
+<title>Td5 Diagnostics</title>
+<style>
+  /* ---- Theme: blue / white / grey, professional ------------------------- */
+  :root{
+    --blue:#12457e; --blue-2:#1e6fc4; --blue-tint:#e8f1fb;
+    --grey-bg:#eef1f4; --card:#ffffff; --line:#d3dae1;
+    --ink:#20303f; --ink-2:#5c6b78; --ink-3:#8a97a3;
+    --ok:#2e7d32; --warn:#b26a00; --bad:#c62828;
+    --radius:10px; --shadow:0 1px 3px rgba(20,40,70,.10),0 1px 2px rgba(20,40,70,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--grey-bg); color:var(--ink); font-size:15px; line-height:1.4;
+    -webkit-text-size-adjust:100%;
+  }
+  /* ---- Top bar ---------------------------------------------------------- */
+  header{
+    background:var(--blue); color:#fff; padding:10px 14px;
+    display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:20;
+    padding-top:calc(10px + env(safe-area-inset-top));
+  }
+  header .title{font-weight:600; font-size:17px; letter-spacing:.2px}
+  header .spacer{flex:1}
+  .status{display:flex; align-items:center; gap:8px; font-size:13px; color:#cfe0f2}
+  .dot{width:10px; height:10px; border-radius:50%; background:#8a97a3; flex:none}
+  .dot.on{background:#66d18a} .dot.busy{background:#ffcc55} .dot.off{background:#e88}
+  button{
+    font:inherit; cursor:pointer; border:0; border-radius:8px; padding:8px 14px;
+    background:var(--blue-2); color:#fff; font-weight:600;
+  }
+  button.ghost{background:rgba(255,255,255,.14); color:#fff}
+  button.secondary{background:#fff; color:var(--blue); border:1px solid var(--line)}
+  button.danger{background:var(--bad)}
+  button:disabled{opacity:.5; cursor:not-allowed}
+  button:active{transform:translateY(1px)}
+  /* ---- Tabs ------------------------------------------------------------- */
+  nav{
+    display:flex; background:var(--card); border-bottom:1px solid var(--line);
+    position:sticky; top:52px; z-index:15; overflow-x:auto;
+  }
+  nav button{
+    background:none; color:var(--ink-2); border-radius:0; padding:12px 16px;
+    font-weight:600; border-bottom:3px solid transparent; white-space:nowrap; flex:1;
+  }
+  nav button.active{color:var(--blue); border-bottom-color:var(--blue)}
+  main{padding:14px; max-width:900px; margin:0 auto}
+  .tab{display:none} .tab.active{display:block}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:14px; margin-bottom:12px;
+  }
+  h2{font-size:15px; margin:0 0 10px; color:var(--ink); font-weight:600}
+  .muted{color:var(--ink-2)} .small{font-size:12px}
+  .hint{color:var(--ink-3); font-size:13px}
+  /* ---- Available data list --------------------------------------------- */
+  .avail-row{
+    display:flex; align-items:center; gap:10px; padding:9px 4px;
+    border-bottom:1px solid var(--line);
+  }
+  .avail-row:last-child{border-bottom:0}
+  .avail-row.off{opacity:.4}
+  .avail-name{flex:1; min-width:0}
+  .avail-name .n{font-weight:600}
+  .avail-name .pid{color:var(--ink-3); font-size:12px; margin-left:6px}
+  .chk{display:flex; flex-direction:column; align-items:center; font-size:11px; color:var(--ink-2); gap:2px; width:52px; flex:none}
+  .chk input{width:18px; height:18px; accent-color:var(--blue-2)}
+  .units{display:flex; gap:6px; font-size:11px; color:var(--ink-2); width:120px; flex:none; justify-content:flex-end}
+  .units label{display:flex; align-items:center; gap:3px; white-space:nowrap}
+  .units input{accent-color:var(--blue-2)}
+  .units .static{color:var(--ink-3)}
+  /* ---- Live data ------------------------------------------------------- */
+  .live-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px}
+  .live-cell{background:var(--blue-tint); border:1px solid #d5e6f7; border-radius:var(--radius); padding:12px}
+  .live-cell .lbl{font-size:12px; color:var(--ink-2); margin-bottom:4px}
+  .live-cell .lbl .pid{color:var(--ink-3); font-size:11px; margin-left:6px; font-weight:400}
+  .live-cell .val{font-size:26px; font-weight:600; color:var(--blue); line-height:1.1}
+  .live-cell .unit{font-size:13px; color:var(--ink-2); margin-left:4px; font-weight:400}
+  .flags{display:flex; flex-wrap:wrap; gap:6px; margin-top:4px}
+  .flag{font-size:11px; padding:2px 7px; border-radius:10px; background:#dfe6ec; color:var(--ink-2)}
+  .flag.on{background:var(--blue-2); color:#fff}
+  /* ---- Charts ---------------------------------------------------------- */
+  .chart-card{padding:8px 10px 10px}
+  .chart-head{display:flex; justify-content:space-between; align-items:baseline; margin:2px 2px 4px}
+  .chart-head .t{font-weight:600; font-size:13px}
+  .chart-head .v{font-weight:600; color:var(--blue)}
+  canvas{width:100%; height:150px; display:block}
+  /* ---- Fault codes ----------------------------------------------------- */
+  .mil{display:flex; align-items:center; gap:10px; margin-bottom:10px}
+  .badge{padding:3px 10px; border-radius:12px; font-size:13px; font-weight:600}
+  .badge.ok{background:#e3f4e5; color:var(--ok)} .badge.bad{background:#fde5e5; color:var(--bad)}
+  .dtc{display:flex; align-items:center; gap:12px; padding:10px 4px; border-bottom:1px solid var(--line)}
+  .dtc:last-child{border-bottom:0}
+  .dtc .code{font-weight:700; color:var(--blue); font-family:"Consolas",monospace; width:64px; flex:none}
+  .dtc .desc{flex:1; min-width:0}
+  .dtc a{color:var(--blue-2); font-size:13px; text-decoration:none; white-space:nowrap}
+  .dtc a:hover{text-decoration:underline}
+  .row-actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px}
+  /* ---- Toast ----------------------------------------------------------- */
+  #toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    background:var(--ink); color:#fff; padding:10px 16px; border-radius:8px;
+    font-size:14px; box-shadow:var(--shadow); opacity:0; pointer-events:none;
+    transition:opacity .2s; z-index:50; max-width:90%;
+  }
+  #toast.show{opacity:.95}
+  .empty{color:var(--ink-3); text-align:center; padding:26px 10px}
+</style>
+</head>
+<body>
+<header>
+  <span class="title">Td5 Diagnostics</span>
+  <span class="spacer"></span>
+  <span class="status"><span id="dot" class="dot off"></span><span id="statusText">Disconnected</span></span>
+  <button id="connectBtn">Connect</button>
+</header>
+
+<nav>
+  <button data-tab="faults" class="active">Fault Codes</button>
+  <button data-tab="avail">Available Data</button>
+  <button data-tab="live">Live Data</button>
+  <button data-tab="graphs">Graphs</button>
+</nav>
+
+<main>
+  <!-- FAULT CODES ------------------------------------------------------- -->
+  <section id="tab-faults" class="tab active">
+    <div class="card">
+      <div class="mil">
+        <span class="muted">Malfunction indicator (MIL):</span>
+        <span id="milBadge" class="badge ok">Unknown</span>
+        <span id="dtcCount" class="muted small"></span>
+      </div>
+      <div class="row-actions">
+        <button id="readDtcBtn" class="secondary">Read Codes</button>
+        <button id="clearDtcBtn" class="danger">Clear Codes</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Stored fault codes</h2>
+      <div id="dtcList"><div class="empty">Not read yet. Connect and tap "Read Codes".</div></div>
+    </div>
+  </section>
+
+  <!-- AVAILABLE DATA ---------------------------------------------------- -->
+  <section id="tab-avail" class="tab">
+    <div class="card">
+      <h2>Available data</h2>
+      <p class="hint">Tick <b>Display</b> to show a value on the Live Data tab, <b>Graph</b> to chart it
+      (up to 4). Choose units per item. Selections are remembered.</p>
+      <div id="availList"></div>
+    </div>
+  </section>
+
+  <!-- LIVE DATA --------------------------------------------------------- -->
+  <section id="tab-live" class="tab">
+    <div class="card">
+      <h2>Live data</h2>
+      <div id="liveGrid" class="live-grid"></div>
+      <div id="liveEmpty" class="empty">No items selected. Choose some on the Available Data tab.</div>
+    </div>
+  </section>
+
+  <!-- GRAPHS ------------------------------------------------------------ -->
+  <section id="tab-graphs" class="tab">
+    <div id="graphWrap"></div>
+    <div id="graphEmpty" class="empty">No items graphed. Tick up to 4 "Graph" boxes on the Available Data tab.</div>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<!-- Native BLE bridge: present only in the packaged app (Capacitor). In a plain
+     browser this bundle loads a web-platform Capacitor whose isNativePlatform()
+     is false, so the app transparently falls back to Web Bluetooth. -->
+<script src="ble-shim.js"></script>
+<script>
+"use strict";
+/* =======================================================================
+   Td5 Diagnostics PWA - Web Bluetooth client for the Td5 ELM327 dongle.
+
+   Talks the dongle's own ELM dialect (service FFF0 / notify FFF1 / write FFF2,
+   device "OBDII"). Deliberately polls ONE PID at a time and waits for each
+   reply - the mode the dongle handles perfectly - so it never triggers the
+   multi-frame path that trips generic apps. Firmware is untouched.
+   ===================================================================== */
+
+/* ---- BLE UUIDs ------------------------------------------------------- */
+const SVC = 0xFFF0, CH_NOTIFY = 0xFFF1, CH_WRITE = 0xFFF2;              // Web Bluetooth (16-bit)
+const SVC128   ='0000fff0-0000-1000-8000-00805f9b34fb',                 // native plugin (128-bit)
+      NOTIFY128='0000fff1-0000-1000-8000-00805f9b34fb',
+      WRITE128 ='0000fff2-0000-1000-8000-00805f9b34fb';
+
+/* ---- Unit conversions ------------------------------------------------ */
+const C2F   = v => v*9/5 + 32;
+const KMH2M = v => v*0.621371;
+const KPA2P = v => v*0.145038;
+const BAR2P = v => v*14.5038;
+
+/* A metric/imperial pair for the values that have both; `uk` = the item's
+   default selection under the UK-mix scheme. Items without `alt` show a
+   single fixed unit and no radio. */
+const U = {
+  rpm:   {native:'rpm'},
+  kmh:   {native:'km/h', alt:'mph',  conv:KMH2M, uk:'imperial'},
+  degC:  {native:'°C', alt:'°F', conv:C2F, uk:'metric'},
+  kpa:   {native:'kPa',  alt:'psi',  conv:KPA2P, uk:'imperial'},
+  bar:   {native:'bar',  alt:'psi',  conv:BAR2P, uk:'imperial'},
+  pct:   {native:'%'}, gps:{native:'g/s'}, volt:{native:'V'},
+  sec:   {native:'s'}, mg:{native:'mg'}, gear:{native:''}, bits:{native:''}, raw:{native:''},
+  apairs:{native:''}, trim:{native:''}
+};
+
+/* ---- PID catalogue --------------------------------------------------- *
+   d = array of data bytes (the bytes after the "41 XX" / "62 F0 XX" prefix).
+   range/bit locate a standard PID in the 0100/0120/0140 support bitmask.  */
+const PIDS = [
+  // key,     name,                 cmd,     prefix,  bytes, decode,                     unit,   dec, graph, range,bit
+  mk('rpm',   'Engine RPM',         '010C', '410C', 2, d=>(d[0]*256+d[1])/4,        U.rpm,  0, true,  0x00, 0x0C),
+  mk('speed', 'Vehicle Speed',      '010D', '410D', 1, d=>d[0],                     U.kmh,  0, true,  0x00, 0x0D),
+  mk('coolant','Coolant Temp',      '0105', '4105', 1, d=>d[0]-40,                  U.degC, 0, true,  0x00, 0x05),
+  mk('iat',   'Intake Air Temp',    '010F', '410F', 1, d=>d[0]-40,                  U.degC, 0, true,  0x00, 0x0F),
+  mk('map',   'Intake MAP',         '010B', '410B', 1, d=>d[0],                     U.kpa,  0, true,  0x00, 0x0B),
+  mk('baro',  'Barometric Pressure','0133', '4133', 1, d=>d[0],                     U.kpa,  0, true,  0x20, 0x33),
+  mk('maf',   'Mass Air Flow',      '0110', '4110', 2, d=>(d[0]*256+d[1])/100,      U.gps,  1, true,  0x00, 0x10),
+  mk('thr',   'Throttle / Demand',  '0111', '4111', 1, d=>d[0]*100/255,            U.pct,  1, true,  0x00, 0x11),
+  mk('load',  'Engine Load',        '0104', '4104', 1, d=>d[0]*100/255,            U.pct,  1, true,  0x00, 0x04),
+  mk('run',   'Run Time',           '011F', '411F', 2, d=>d[0]*256+d[1],            U.sec,  0, true,  0x00, 0x1F),
+  mk('volt',  'Module Voltage',     '0142', '4142', 2, d=>(d[0]*256+d[1])/1000,     U.volt, 1, true,  0x40, 0x42),
+  // Td5 custom (mode 22, DIDs F001..F00D)
+  mkc('inj',  'Td5 Injection Qty',  '22F001','62F001', 2, d=>(d[0]*256+d[1])/100,   U.mg,   1, true),
+  mkc('boost','Td5 Boost',          '22F002','62F002', 2, d=>((d[0]*256+d[1])/1000)-1, U.bar,2, true),
+  mkc('fuelt','Td5 Fuel Temp',      '22F003','62F003', 1, d=>d[0]-40,               U.degC, 0, true),
+  mkc('tmaf', 'Td5 MAF Air Mass',   '22F004','62F004', 2, d=>(d[0]*256+d[1])/100,   U.gps,  1, true),
+  mkc('trq',  'Td5 Torque Limit',   '22F005','62F005', 2, d=>(d[0]*256+d[1])/100,   U.mg,   1, true),
+  mkc('smk',  'Td5 Smoke Limit',    '22F006','62F006', 2, d=>(d[0]*256+d[1])/100,   U.mg,   1, true),
+  mkc('egr',  'Td5 EGR Position',   '22F007','62F007', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
+  mkc('wg',   'Td5 Wastegate Pos',  '22F008','62F008', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
+  mkc('gear', 'Td5 Selected Gear',  '22F009','62F009', 1, d=>d[0],                  U.gear, 0, true),
+  mkc('at1',  'Td5 Accel Track 1',  '22F00A','62F00A', 2, d=>(d[0]*256+d[1])/1000,  U.volt, 2, true),
+  mkc('at2',  'Td5 Accel Track 2',  '22F00B','62F00B', 2, d=>(d[0]*256+d[1])/1000,  U.volt, 2, true),
+  mkc('dem',  'Td5 Driver Demand',  '22F00C','62F00C', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
+  mkc('at3',  'Td5 Accel Track 3',  '22F00E','62F00E', 2, d=>(d[0]*256+d[1])/1000,  U.volt, 2, true),
+  mkc('vref', 'Td5 Accel Supply (5V)','22F010','62F010', 2, d=>(d[0]*256+d[1])/1000,U.volt, 2, true),
+  mkc('stat', 'Td5 Input Switches', '22F00D','62F00D', 1, d=>d[0],                  U.bits, 0, false),
+  mkc('inj1', 'Td5 Injector 1 Fuelling','22F013','62F013',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
+  mkc('inj2', 'Td5 Injector 2 Fuelling','22F014','62F014',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
+  mkc('inj3', 'Td5 Injector 3 Fuelling','22F015','62F015',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
+  mkc('inj4', 'Td5 Injector 4 Fuelling','22F016','62F016',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
+  mkc('inj5', 'Td5 Injector 5 Fuelling','22F017','62F017',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true)
+];
+function mk(key,name,cmd,prefix,bytes,decode,unit,dec,graph,range,bit){
+  return {key,name,cmd,prefix,bytes,decode,unit,dec,graph,std:true,range,bit,
+          avail:false, display:false, graphOn:false, unitSel:unit.uk||'metric',
+          value:null, samples:[]};
+}
+function mkc(key,name,cmd,prefix,bytes,decode,unit,dec,graph){
+  return {key,name,cmd,prefix,bytes,decode,unit,dec,graph,std:false,
+          avail:true, display:false, graphOn:false, unitSel:unit.uk||'metric',
+          value:null, samples:[]};
+}
+const STATUS_FLAGS = ['Brake','Clutch','Cruise Master','Cruise Set','Cruise Resume','A/C','Transfer Hi']; // F00D bit0..6
+
+/* ---- Td5 fault table (full, generated from td5_dtc_table.h): [X, Y, desc, pcode] */
+const TD5_DTC_TABLE = [
+  [1,1,"EGR inlet throttle diagnostics (L)","P0403"],
+  [1,2,"Turbo wastegate diagnostics (L)","P0243"],
+  [1,3,"EGR vacuum diagnostics (L)","P0409"],
+  [1,4,"Temperature gauge diagnostics (L)",""],
+  [1,5,"Driver demand problem 1 (L)","P0121"],
+  [1,6,"Driver demand problem 2 (L)","P0221"],
+  [1,7,"Air flow (MAF) circuit (L)","P0100"],
+  [1,8,"Manifold pressure (MAP) circuit (L)","P0105"],
+  [2,1,"Inlet air temp circuit (L)","P0110"],
+  [2,2,"Fuel temp circuit (L)","P0180"],
+  [2,3,"Coolant temp circuit (L)","P0115"],
+  [2,4,"Battery volts (L)","P0560"],
+  [2,5,"Reference voltage (L)","P0641"],
+  [2,6,"Ambient air temp circuit (L)","P0070"],
+  [2,7,"Driver demand supply problem (L)","P0641"],
+  [2,8,"Ambient pressure circuit (L)","P2227"],
+  [3,1,"EGR inlet throttle diagnostics (L)","P0403"],
+  [3,2,"Turbo wastegate diagnostics (L)","P0243"],
+  [3,3,"EGR vacuum diagnostics (L)","P0409"],
+  [3,4,"Temperature gauge diagnostics (L)",""],
+  [3,5,"Driver demand problem 1 (L)","P0121"],
+  [3,6,"Driver demand problem 2 (L)","P0221"],
+  [3,7,"Air flow (MAF) circuit (L)","P0100"],
+  [3,8,"Manifold pressure (MAP) circuit (L)","P0105"],
+  [4,1,"Inlet air temp circuit (L)","P0110"],
+  [4,2,"Fuel temp circuit (L)","P0180"],
+  [4,3,"Coolant temp circuit (L)","P0115"],
+  [4,4,"Battery volts (L)","P0560"],
+  [4,5,"Reference voltage (L)","P0641"],
+  [4,6,"Ambient air temp circuit (L)","P0070"],
+  [4,7,"Driver demand supply problem (L)","P0641"],
+  [4,8,"Ambient pressure circuit (L)","P2227"],
+  [5,1,"EGR inlet throttle diagnostics (C)","P0403"],
+  [5,2,"Turbo wastegate diagnostics (C)","P0243"],
+  [5,3,"EGR vacuum diagnostics (C)","P0409"],
+  [5,4,"Temperature gauge diagnostics (C)",""],
+  [5,5,"Driver demand problem 1 (C)","P0121"],
+  [5,6,"Driver demand problem 2 (C)","P0221"],
+  [5,7,"Air flow (MAF) circuit (C)","P0100"],
+  [5,8,"Manifold pressure (MAP) circuit (C)","P0105"],
+  [6,1,"Inlet air temp circuit (C)","P0110"],
+  [6,2,"Fuel temp circuit (C)","P0180"],
+  [6,3,"Coolant temp circuit (C)","P0115"],
+  [6,4,"Battery voltage problem (C)","P0560"],
+  [6,5,"Reference voltage (C)","P0641"],
+  [6,7,"Driver demand supply problem (C)","P0641"],
+  [6,8,"Ambient pressure circuit (C)","P2227"],
+  [7,1,"Cruise lamp drive over-temp (L)",""],
+  [7,2,"Fuel-used output drive over-temp (L)",""],
+  [7,3,"Radiator fan drive over-temp (L)","P0480"],
+  [7,4,"Active engine mounting over-temp (L)",""],
+  [7,5,"Turbo wastegate short circuit (L)","P0245"],
+  [7,6,"EGR inlet throttle short circuit (L)","P0405"],
+  [7,7,"EGR vacuum modulator short circuit (L)","P0409"],
+  [7,8,"Temperature gauge short circuit (L)",""],
+  [8,1,"A/C fan drive over-temp (L)",""],
+  [8,2,"Fuel pump drive over-temp (L)","P0230"],
+  [8,3,"Tacho drive over-temp (L)",""],
+  [8,4,"Gearbox/ABS drive over-temp (L)",""],
+  [8,5,"A/C clutch over-temp (L)",""],
+  [8,6,"MIL lamp drive over-temp (L)",""],
+  [8,7,"Glow plug relay drive over-temp (L)","P0380"],
+  [8,8,"Glow plug lamp drive over-temp (L)","P0380"],
+  [9,1,"Fuel-used output drive open load (L)",""],
+  [9,2,"Cruise lamp drive open load (L)",""],
+  [9,3,"Radiator fan drive open load (L)","P0480"],
+  [9,4,"Active engine mounting open load (L)",""],
+  [9,5,"Turbo wastegate open load (L)","P0244"],
+  [9,6,"EGR inlet throttle open load (L)","P0404"],
+  [9,7,"EGR vacuum modulator open load (L)","P0409"],
+  [9,8,"Temperature gauge open load (L)",""],
+  [10,1,"A/C fan drive open load (L)",""],
+  [10,2,"Fuel pump drive open load (L)","P0230"],
+  [10,3,"Tachometer open load (L)",""],
+  [10,4,"Gearbox/ABS drive open load (L)",""],
+  [10,5,"A/C clutch open load (L)",""],
+  [10,6,"MIL lamp drive open load (L)",""],
+  [10,7,"Glow plug lamp drive open load (L)","P0380"],
+  [10,8,"Glow plug relay drive open load (L)","P0380"],
+  [11,1,"Cruise lamp drive over-temp (C)",""],
+  [11,2,"Fuel-used output drive over-temp (C)",""],
+  [11,3,"Radiator fan drive over-temp (C)","P0480"],
+  [11,4,"Active engine mounting over-temp (C)",""],
+  [11,5,"Turbo wastegate short circuit (C)","P0245"],
+  [11,6,"EGR inlet throttle short circuit (C)","P0405"],
+  [11,7,"EGR vacuum modulator short circuit (C)","P0409"],
+  [11,8,"Temperature gauge short circuit (C)",""],
+  [12,1,"A/C fan drive open load (C)",""],
+  [12,2,"Fuel pump drive open load (C)","P0230"],
+  [12,3,"Tachometer open load (C)",""],
+  [12,4,"Gearbox/ABS drive open load (C)",""],
+  [12,5,"A/C clutch open load (C)",""],
+  [12,6,"MIL lamp drive open load (C)",""],
+  [12,7,"Glow plug relay drive open load (C)","P0380"],
+  [12,8,"Glow plug relay drive open load (C)","P0380"],
+  [13,1,"Cruise lamp drive over-temp (C)",""],
+  [13,2,"Fuel-used output drive over-temp (C)",""],
+  [13,3,"Radiator fan drive over-temp (C)","P0480"],
+  [13,4,"Active engine mounting over-temp (C)",""],
+  [13,5,"Turbo wastegate short circuit (C)","P0245"],
+  [13,6,"EGR inlet throttle short circuit (C)","P0405"],
+  [13,7,"EGR vacuum modulator short circuit (C)","P0409"],
+  [13,8,"Temperature gauge short circuit (C)",""],
+  [14,1,"A/C fan drive open load (C)",""],
+  [14,2,"Fuel pump drive open load (C)","P0230"],
+  [14,3,"Tachometer open load (C)",""],
+  [14,4,"Gearbox/ABS drive open load (C)",""],
+  [14,5,"A/C clutch open load (C)",""],
+  [14,6,"MIL lamp drive open load (C)",""],
+  [14,7,"Glow plug relay drive open load (C)","P0380"],
+  [14,8,"Glow plug relay drive open load (C)","P0380"],
+  [15,2,"High speed crank (L)","P0335"],
+  [16,2,"High speed crank (L)","P0335"],
+  [17,2,"High speed crank (C)","P0335"],
+  [19,2,"CAN Rx/Tx error (L)","U0001"],
+  [19,3,"CAN Tx/Rx error (L)","U0001"],
+  [19,6,"Noisy crank signal detected (L)","P0335"],
+  [19,8,"CAN reset failure (L)","U0001"],
+  [20,1,"Turbocharger under-boosting (L)","P0299"],
+  [20,2,"Turbocharger over-boosting (L)","P0234"],
+  [20,4,"EGR valve stuck open (L)","P0402"],
+  [20,5,"EGR valve stuck closed (L)","P0401"],
+  [21,4,"Driver demand 1 out of range (L)","P0121"],
+  [21,5,"Driver demand 2 out of range (L)","P0221"],
+  [21,6,"Driver demand problem detected (L)","P0120"],
+  [21,7,"Driver demand inconsistencies (L)","P2135"],
+  [21,8,"Injector trim data corrupted (L)","P1633"],
+  [22,1,"Road speed missing (L)","P0500"],
+  [22,3,"Accel outside cruise bounds (L)",""],
+  [22,7,"Cruise resume switch stuck closed (L)",""],
+  [22,8,"Cruise set switch stuck closed (L)",""],
+  [23,1,"Excessive CAN bus-off (C)","U0001"],
+  [23,2,"CAN Rx/Tx error (C)","U0001"],
+  [23,3,"CAN Tx/Rx error (C)","U0001"],
+  [23,4,"Cannot detect remote CAN mode (C)","U0001"],
+  [23,5,"Under-boost occurred this trip (C)","P0299"],
+  [23,6,"Noisy crank signal detected (C)","P0335"],
+  [24,1,"Turbocharger under-boosting (C)","P0299"],
+  [24,2,"Turbocharger over-boosting (C)","P0234"],
+  [24,3,"Over-boost occurred this trip (C)","P0234"],
+  [24,4,"EGR valve stuck open (C)","P0402"],
+  [24,5,"EGR valve stuck closed (C)","P0401"],
+  [24,7,"Auto gearbox problem detected (C)","P0700"],
+  [25,4,"Driver demand 1 out of range (L)","P0121"],
+  [25,5,"Driver demand 2 out of range (L)","P0221"],
+  [25,6,"Driver demand problem detected (C)","P0120"],
+  [25,7,"Driver demand inconsistencies (C)","P2135"],
+  [25,8,"Injector trim data corrupted (C)","P1633"],
+  [26,1,"Road speed missing (C)","P0500"],
+  [26,2,"Cruise control system problem (C)",""],
+  [26,3,"Accel outside cruise bounds (C)",""],
+  [26,7,"Cruise resume switch stuck closed (C)",""],
+  [26,8,"Cruise set switch stuck closed (C)",""],
+  [27,1,"Injector 1 peak charge long (L)","P0201"],
+  [27,2,"Injector 2 peak charge long (L)","P0202"],
+  [27,3,"Injector 3 peak charge long (L)","P0203"],
+  [27,4,"Injector 4 peak charge long (L)","P0204"],
+  [27,5,"Injector 5 peak charge long (L)","P0205"],
+  [27,6,"Injector 6 peak charge long (L)","P0206"],
+  [27,7,"Topside switch failed post-injection (L)",""],
+  [28,1,"Injector 1 peak charge short (L)","P0201"],
+  [28,2,"Injector 2 peak charge short (L)","P0202"],
+  [28,3,"Injector 3 peak charge short (L)","P0203"],
+  [28,4,"Injector 4 peak charge short (L)","P0204"],
+  [28,5,"Injector 5 peak charge short (L)","P0205"],
+  [28,6,"Injector 6 peak charge short (L)","P0206"],
+  [28,7,"Topside switch failed pre-injection (L)",""],
+  [29,1,"Injector 1 peak charge long (C)","P0201"],
+  [29,2,"Injector 2 peak charge long (C)","P0202"],
+  [29,3,"Injector 3 peak charge long (C)","P0203"],
+  [29,4,"Injector 4 peak charge long (C)","P0204"],
+  [29,5,"Injector 5 peak charge long (C)","P0205"],
+  [29,6,"Injector 6 peak charge long (C)","P0206"],
+  [29,7,"Topside switch failed post-injection (C)",""],
+  [30,1,"Injector 1 peak charge short (C)","P0201"],
+  [30,2,"Injector 2 peak charge short (C)","P0202"],
+  [30,3,"Injector 3 peak charge short (C)","P0203"],
+  [30,4,"Injector 4 peak charge short (C)","P0204"],
+  [30,5,"Injector 5 peak charge short (C)","P0205"],
+  [30,6,"Injector 6 peak charge short (C)","P0206"],
+  [30,7,"Topside switch failed pre-injection (C)",""],
+  [31,1,"Injector 1 open circuit (L)","P0201"],
+  [31,2,"Injector 2 open circuit (L)","P0202"],
+  [31,3,"Injector 3 open circuit (L)","P0203"],
+  [31,4,"Injector 4 open circuit (L)","P0204"],
+  [31,5,"Injector 5 open circuit (L)","P0205"],
+  [31,6,"Injector 6 open circuit (L)","P0206"],
+  [32,1,"Injector 1 short circuit (L)","P0201"],
+  [32,2,"Injector 2 short circuit (L)","P0202"],
+  [32,3,"Injector 3 short circuit (L)","P0203"],
+  [32,4,"Injector 4 short circuit (L)","P0204"],
+  [32,5,"Injector 5 short circuit (L)","P0205"],
+  [32,6,"Injector 6 short circuit (L)","P0206"],
+  [33,1,"Injector 1 open circuit (C)","P0201"],
+  [33,2,"Injector 2 open circuit (C)","P0202"],
+  [33,3,"Injector 3 open circuit (C)","P0203"],
+  [33,4,"Injector 4 open circuit (C)","P0204"],
+  [33,5,"Injector 5 open circuit (C)","P0205"],
+  [33,6,"Injector 6 open circuit (C)","P0206"],
+  [34,1,"Injector 1 short circuit (C)","P0201"],
+  [34,2,"Injector 2 short circuit (C)","P0202"],
+  [34,3,"Injector 3 short circuit (C)","P0203"],
+  [34,4,"Injector 4 short circuit (C)","P0204"],
+  [34,5,"Injector 5 short circuit (C)","P0205"],
+  [34,6,"Injector 6 short circuit (C)","P0206"],
+  [35,1,"Injector 1 partial short circuit (L)","P0201"],
+  [35,2,"Injector 2 partial short circuit (L)","P0202"],
+  [35,3,"Injector 3 partial short circuit (L)","P0203"],
+  [35,4,"Injector 4 partial short circuit (L)","P0204"],
+  [35,5,"Injector 5 partial short circuit (L)","P0205"],
+  [35,6,"Injector 6 partial short circuit (L)","P0206"]
+];
+const TD5_XY = {}, PCODE_DESC = {};
+for (const r of TD5_DTC_TABLE){ TD5_XY[r[0]+'-'+r[1]] = r[2];
+  if (r[3]){ const b=r[2].replace(/\s*\((L|C)\)\s*$/,''); if(!PCODE_DESC[r[3]]) PCODE_DESC[r[3]]=b; } }
+// A received DTC is either a real inferred OBD code, or a synthesised P(0x1000+bitIndex)
+// for a Td5 fault with no OBD equivalent - reverse the latter to its Td5 X-Y description.
+function dtcInfo(code){
+  const hex = parseInt(code.slice(1),16);
+  if (code[0]==='P' && hex>=0x1000 && hex<=0x1000+279){
+    const raw=hex-0x1000, x=(raw>>3)+1, y=(raw&7)+1, d=TD5_XY[x+'-'+y];
+    return { desc: d||('Undefined Td5 fault bit '+x+'-'+y), tag:'Td5 '+x+'-'+y };
+  }
+  return { desc: PCODE_DESC[code]||'Manufacturer-specific code', tag:code };
+}
+
+/* ===================================================================== *
+   BLE transport + serialized command queue
+   ===================================================================== */
+let device=null, writeChar=null, notifyChar=null, connected=false;
+let nativeDevId=null;                         // Capacitor BLE device id (native app)
+let rxBuf='', pending=null, chain=Promise.resolve();
+// True only inside the packaged app (Capacitor native platform + BLE plugin present).
+function isNative(){ return !!(window.Capacitor && window.Capacitor.isNativePlatform &&
+                               window.Capacitor.isNativePlatform() && window.BleClient); }
+
+function statusUI(state,text){
+  const dot=document.getElementById('dot');
+  dot.className='dot '+state;
+  document.getElementById('statusText').textContent=text;
+  const b=document.getElementById('connectBtn');
+  b.textContent = connected ? 'Disconnect' : 'Connect';
+}
+
+/* Both transports funnel their notification bytes through handleRx(). */
+function handleRx(s){
+  rxBuf+=s;
+  const gt=rxBuf.indexOf('>');
+  if(gt>=0 && pending){
+    const resp=rxBuf.slice(0,gt);
+    rxBuf=rxBuf.slice(gt+1);
+    const p=pending; pending=null; clearTimeout(p.timer);
+    p.resolve(resp.replace(/[\r\n]/g,' ').trim());
+  }
+}
+function dvToStr(dv){ let s=''; for(let i=0;i<dv.byteLength;i++) s+=String.fromCharCode(dv.getUint8(i)); return s; }
+function onNotify(e){ handleRx(dvToStr(e.target.value)); }   // Web Bluetooth event
+
+/* Serialized send: only one command in flight; resolves with reply text. */
+function send(cmd){ chain = chain.then(()=>sendNow(cmd)); return chain; }
+function sendNow(cmd){
+  return new Promise(async resolve=>{
+    if(!connected){ resolve(''); return; }
+    rxBuf='';
+    pending={resolve, timer:setTimeout(()=>{ if(pending){pending=null; resolve('TIMEOUT'); } },2500)};
+    const bytes=new TextEncoder().encode(cmd+'\r');
+    try{
+      if(isNative()){
+        await window.BleClient.writeWithoutResponse(nativeDevId, SVC128, WRITE128,
+              new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+      } else {
+        try{ await writeChar.writeValueWithoutResponse(bytes); }
+        catch(e){ await writeChar.writeValue(bytes); }
+      }
+    }catch(err){ if(pending){ pending=null; clearTimeout(pending.timer); resolve('ERR'); } }
+  });
+}
+
+async function connect(fromClick){
+  try{
+    statusUI('busy','Connecting...');
+    if(isNative()) await connectNative(fromClick);
+    else           await connectWeb(fromClick);
+  }catch(err){
+    connected=false; statusUI('off','Disconnected');
+    if(fromClick) toast('Connection failed: '+(err.message||err));
+  }
+}
+
+/* Browser transport: Web Bluetooth. */
+async function connectWeb(fromClick){
+  if(!navigator.bluetooth){ toast('Web Bluetooth not available. Use Chrome/Edge or the app.'); statusUI('off','Disconnected'); return; }
+  if(!device){
+    if(fromClick){
+      device=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]},{name:'OBDII'}], optionalServices:[SVC]});
+    } else {
+      const known=(navigator.bluetooth.getDevices)?await navigator.bluetooth.getDevices():[];
+      device=known.find(d=>d.name==='OBDII')||known[0];
+      if(!device){ statusUI('off','Disconnected'); return; }
+    }
+  }
+  device.addEventListener('gattserverdisconnected',onDisconnected);
+  const server=await device.gatt.connect();
+  const svc=await server.getPrimaryService(SVC);
+  notifyChar=await svc.getCharacteristic(CH_NOTIFY);
+  writeChar =await svc.getCharacteristic(CH_WRITE);
+  await notifyChar.startNotifications();
+  notifyChar.addEventListener('characteristicvaluechanged',onNotify);
+  await afterConnect(device.name||'Connected');
+}
+
+/* Packaged-app transport: @capacitor-community/bluetooth-le. */
+async function connectNative(fromClick){
+  const BC=window.BleClient;
+  await BC.initialize({androidNeverForLocation:true});
+  if(fromClick){
+    // Manual Connect ALWAYS does a fresh scan/pick - never reuse a remembered
+    // address. A stale address survives app/phone churn and causes GATT connect
+    // timeouts (status 147); re-scanning avoids that entirely.
+    const d=await BC.requestDevice({services:[SVC128], optionalServices:[SVC128], name:'OBDII'});
+    nativeDevId=d.deviceId; try{ localStorage.setItem('td5pwa_devid',nativeDevId); }catch(e){}
+  } else {
+    // Silent auto-connect on launch: reuse the last device if we have one.
+    const saved=localStorage.getItem('td5pwa_devid');
+    if(!saved){ statusUI('off','Disconnected'); return; }
+    nativeDevId=saved;
+  }
+  await BC.connect(nativeDevId, ()=>onDisconnected());
+  await BC.startNotifications(nativeDevId, SVC128, NOTIFY128, dv=>handleRx(dvToStr(dv)));
+  await afterConnect('OBDII');
+}
+
+async function afterConnect(name){
+  connected=true; chain=Promise.resolve();
+  statusUI('on', name); toast('Connected');
+  await initAndDiscover(); startPolling();
+  readDtcs().catch(()=>{});
+  setTimeout(()=>{ if(connected) readDtcs().catch(()=>{}); }, 3500);  // buffer fills shortly after connect
+}
+
+function onDisconnected(){
+  connected=false; writeChar=null; notifyChar=null;
+  statusUI('off','Disconnected'); toast('Dongle disconnected');
+  // No auto-reconnect here - auto-connect happens ONLY at app start. After a
+  // manual Disconnect (or a dropout) the user taps Connect to reconnect.
+}
+
+async function disconnect(){
+  try{
+    if(isNative()){ if(nativeDevId) await window.BleClient.disconnect(nativeDevId); }
+    else if(device&&device.gatt.connected){ device.gatt.disconnect(); }
+  }catch(e){}
+  connected=false; statusUI('off','Disconnected');
+}
+
+/* ---- ELM init + PID discovery --------------------------------------- */
+async function initAndDiscover(){
+  for(const c of ['ATZ','ATE0','ATL0','ATS1','ATH0','ATSP6']){ await send(c); await sleep(40); }
+  // Standard-PID support bitmasks (0100/0120/0140).
+  const masks={};
+  for(const base of [0x00,0x20,0x40]){
+    const r=await send('01'+hex2(base));
+    masks[base]=parseSupportMask(r,base);
+  }
+  for(const p of PIDS){
+    if(p.std){
+      const m=masks[p.range];
+      p.avail = m ? bitSet(m, p.bit - p.range) : false;
+    }
+  }
+  loadConfig();          // restore ticks/units now that availability is known
+  renderAvail(); renderLive(); renderGraphs();
+}
+
+function parseSupportMask(resp,base){
+  const t=tok(resp); const pre='41'+hex2(base);
+  const i=t.indexOf('41'); // tolerant: find 41 then base
+  if(i<0) return null;
+  if((t[i+1]||'').toUpperCase()!==hex2(base)) return null;
+  const b=[t[i+2],t[i+3],t[i+4],t[i+5]].map(h=>parseInt(h,16));
+  if(b.some(isNaN)) return null;
+  return b; // 4 bytes, MSB first
+}
+// bit n (1..32) within a 0100-style range: PID = base + n. MSB of byte0 = n=1.
+function bitSet(bytes,n){
+  if(n<1||n>32) return false;
+  const idx=(n-1)>>3, bit=7-((n-1)&7);
+  return ((bytes[idx]>>bit)&1)===1;
+}
+
+/* ===================================================================== *
+   Polling loop
+   ===================================================================== */
+let polling=false;
+async function startPolling(){
+  if(polling) return; polling=true;
+  while(connected){
+    const items=PIDS.filter(p=>p.avail && (p.display||p.graphOn));
+    if(!items.length){ await sleep(200); continue; }
+    for(const p of items){
+      if(!connected) break;
+      const resp=await send(p.cmd);
+      const v=decodeResp(p,resp);
+      if(v!==null){
+        p.value=v;
+        const t=Date.now();
+        p.samples.push({t,v});
+        const cutoff=t-GRAPH_WINDOW_MS-2000;
+        while(p.samples.length && p.samples[0].t<cutoff) p.samples.shift();
+      }
+      updateLiveCell(p);
+    }
+    drawAllGraphs();
+  }
+  polling=false;
+}
+
+function decodeResp(p,resp){
+  if(!resp||/NO DATA|TIMEOUT|ERR|\?/i.test(resp)) return null;
+  const t=tok(resp);
+  // Locate the response prefix bytes, tolerant of stray leading tokens.
+  const pre=p.prefix.match(/../g);           // e.g. ['41','0C'] or ['62','F0','01']
+  let start=-1;
+  for(let i=0;i+pre.length<=t.length;i++){
+    let ok=true;
+    for(let k=0;k<pre.length;k++){ if((t[i+k]||'').toUpperCase()!==pre[k]){ok=false;break;} }
+    if(ok){ start=i+pre.length; break; }
+  }
+  if(start<0) return null;
+  const d=[];
+  for(let k=0;k<p.bytes;k++){ const b=parseInt(t[start+k],16); if(isNaN(b)) return null; d.push(b); }
+  p.raw=d;                              // keep raw data bytes for the raw-frame readouts
+  try{ const v=p.decode(d); return isFinite(v)?v:null; }catch(e){ return null; }
+}
+
+/* ===================================================================== *
+   Fault codes
+   ===================================================================== */
+async function readDtcs(){
+  if(!connected){ toast('Not connected'); return; }
+  // MIL + count from PID 01.
+  const s=await send('0101'); const st=tok(s);
+  let mil=false, cnt=0; const i=st.indexOf('41');
+  if(i>=0 && (st[i+1]||'')==='01'){ const A=parseInt(st[i+2],16); if(!isNaN(A)){ mil=(A&0x80)!==0; cnt=A&0x7F; } }
+  // Stored codes from mode 03.
+  const r=await send('03'); const t=tok(r);
+  const j=t.indexOf('43');
+  const codes=[];
+  if(j>=0){
+    let count=parseInt(t[j+1],16); if(isNaN(count)) count=0;
+    for(let k=0;k<count;k++){
+      const a=parseInt(t[j+2+k*2],16), b=parseInt(t[j+3+k*2],16);
+      if(isNaN(a)||isNaN(b)) break;
+      if(a===0&&b===0) continue;
+      codes.push(dtcCode(a,b));
+    }
+  }
+  renderDtcs(mil,cnt,codes);
+}
+
+function dtcCode(a,b){
+  const T=['P','C','B','U'][(a>>6)&3];
+  return T + ((a>>4)&3) + (a&0x0F).toString(16).toUpperCase()
+           + b.toString(16).toUpperCase().padStart(2,'0');
+}
+
+async function clearDtcs(){
+  if(!connected){ toast('Not connected'); return; }
+  if(!confirm('Clear all stored fault codes on the ECU?')) return;
+  const r=await send('04');
+  if(/44/.test(r)){ toast('Fault codes cleared'); setTimeout(()=>readDtcs(),400); }
+  else toast('Clear not confirmed by ECU');
+}
+
+function renderDtcs(mil,cnt,codes){
+  const badge=document.getElementById('milBadge');
+  badge.className='badge '+(mil?'bad':'ok');
+  badge.textContent = mil?'ON':'Off';
+  document.getElementById('dtcCount').textContent =
+    (cnt||codes.length) ? ('reported count: '+(cnt||codes.length)) : '';
+  const list=document.getElementById('dtcList');
+  if(!codes.length){ list.innerHTML='<div class="empty">No stored fault codes.</div>'; return; }
+  list.innerHTML='';
+  for(const c of codes){
+    const info=dtcInfo(c);
+    const desc=info.desc;
+    const q=encodeURIComponent('Land Rover Td5 '+info.desc+' '+info.tag);
+    const row=el('div','dtc');
+    row.innerHTML=`<span class="code">${c}</span>`+
+                  `<span class="desc">${esc(desc)}</span>`+
+                  `<a href="https://www.google.com/search?q=${q}" target="_blank" rel="noopener">Search online</a>`;
+    list.appendChild(row);
+  }
+}
+
+/* ===================================================================== *
+   Available Data tab
+   ===================================================================== */
+function renderAvail(){
+  const box=document.getElementById('availList'); box.innerHTML='';
+  for(const p of PIDS){
+    const row=el('div','avail-row'+(p.avail?'':' off'));
+
+    const name=el('div','avail-name');
+    name.innerHTML=`<span class="n">${esc(p.name)}</span>`;
+    row.appendChild(name);
+
+    row.appendChild(chkBox('Display', p.display, p.avail, on=>{ p.display=on; saveConfig(); renderLive(); }));
+
+    const gEnabled=p.avail && p.graph;
+    row.appendChild(chkBox('Graph', p.graphOn, gEnabled, (on,input)=>{
+      if(on && countGraphed()>=MAX_GRAPHS){ input.checked=false; toast('Maximum of '+MAX_GRAPHS+' graphs'); return; }
+      p.graphOn=on; saveConfig(); renderGraphs();
+    }));
+
+    row.appendChild(unitPicker(p));
+    box.appendChild(row);
+  }
+}
+function chkBox(label,checked,enabled,cb){
+  const wrap=el('label','chk'); const inp=document.createElement('input');
+  inp.type='checkbox'; inp.checked=checked; inp.disabled=!enabled;
+  inp.addEventListener('change',()=>cb(inp.checked,inp));
+  wrap.appendChild(inp); wrap.appendChild(document.createTextNode(label));
+  return wrap;
+}
+function unitPicker(p){
+  const wrap=el('div','units');
+  if(!p.unit.alt){ wrap.innerHTML=`<span class="static">${p.unit.native||'—'}</span>`; return wrap; }
+  for(const sys of ['metric','imperial']){
+    const lab=el('label'); const inp=document.createElement('input');
+    inp.type='radio'; inp.name='u_'+p.key; inp.checked=(p.unitSel===sys);
+    inp.disabled=!p.avail;
+    inp.addEventListener('change',()=>{ p.unitSel=sys; saveConfig(); updateLiveCell(p); drawAllGraphs(); });
+    lab.appendChild(inp);
+    lab.appendChild(document.createTextNode(sys==='metric'?p.unit.native:p.unit.alt));
+    wrap.appendChild(lab);
+  }
+  return wrap;
+}
+
+/* ---- unit-aware value + label --------------------------------------- */
+function shownUnit(p){ return (p.unit.alt && p.unitSel==='imperial') ? p.unit.alt : p.unit.native; }
+function shownValue(p,raw){
+  if(raw===null||raw===undefined) return null;
+  return (p.unit.alt && p.unitSel==='imperial') ? p.unit.conv(raw) : raw;
+}
+function fmt(p,raw){
+  const v=shownValue(p,raw);
+  if(v===null) return '—';
+  if(p.unit===U.gear) return String(Math.round(v));
+  return v.toFixed(p.dec);
+}
+
+/* ===================================================================== *
+   Live Data tab
+   ===================================================================== */
+function renderLive(){
+  const grid=document.getElementById('liveGrid'); grid.innerHTML='';
+  const items=PIDS.filter(p=>p.display && p.avail);
+  document.getElementById('liveEmpty').style.display=items.length?'none':'block';
+  for(const p of items){
+    const cell=el('div','live-cell'); cell.id='live-'+p.key;
+    cell.innerHTML=`<div class="lbl">${esc(p.name)}<span class="pid">${esc(p.cmd)}</span></div><div class="body"></div>`;
+    grid.appendChild(cell); updateLiveCell(p);
+  }
+}
+function updateLiveCell(p){
+  const cell=document.getElementById('live-'+p.key); if(!cell) return;
+  const body=cell.querySelector('.body');
+  if(p.unit===U.bits){
+    const bits=(p.value|0); let html='<div class="flags">';
+    STATUS_FLAGS.forEach((f,i)=>{ html+=`<span class="flag${(bits>>i)&1?' on':''}">${f}</span>`; });
+    body.innerHTML=html+'</div>'; return;
+  }
+  if(p.unit===U.apairs){
+    // Accelerator raw frame as big-endian 16-bit pairs in volts (/1000), labelled by
+    // frame byte index, so on the vehicle you can see which pair is the real track 3
+    // (compare against Nanocom) and how it moves with the pedal.
+    const r=p.raw||[]; const lim=r.length?r[0]:0; let html='<div class="flags">';
+    for(let i=3;i+1<=lim && i+1<r.length;i+=2){
+      const v=(r[i]<<8)|r[i+1];
+      html+=`<span class="flag">[${i}-${i+1}] ${(v/1000).toFixed(3)} V</span>`;
+    }
+    body.innerHTML=html+'</div>'; return;
+  }
+  if(p.unit===U.raw){
+    // Raw-frame diagnostic: every frame byte as hex + its 8 bits, so on the vehicle
+    // you can press a switch / move the pedal and see exactly which byte/bit changes.
+    const raw=p.raw||[]; let html='';
+    raw.forEach((byte,idx)=>{
+      html+=`<div class="flags"><span class="flag" style="background:#dfe6ec">[${idx}] ${hex2(byte)}</span>`;
+      for(let i=7;i>=0;i--) html+=`<span class="flag${(byte>>i)&1?' on':''}">${i}</span>`;
+      html+='</div>';
+    });
+    body.innerHTML=html||'<span class="muted">--</span>'; return;
+  }
+  body.innerHTML=`<span class="val">${fmt(p,p.value)}</span><span class="unit">${esc(shownUnit(p))}</span>`;
+}
+
+/* ===================================================================== *
+   Graphs tab  (pure-canvas, auto-scaling line charts)
+   ===================================================================== */
+const MAX_GRAPHS=4, GRAPH_WINDOW_MS=60000;
+function countGraphed(){ return PIDS.filter(p=>p.graphOn && p.avail).length; }
+function renderGraphs(){
+  const wrap=document.getElementById('graphWrap'); wrap.innerHTML='';
+  const items=PIDS.filter(p=>p.graphOn && p.avail);
+  document.getElementById('graphEmpty').style.display=items.length?'none':'block';
+  for(const p of items){
+    const card=el('div','card chart-card'); card.id='chart-'+p.key;
+    card.innerHTML=`<div class="chart-head"><span class="t">${esc(p.name)}</span>`+
+                   `<span class="v" id="cv-${p.key}"></span></div>`+
+                   `<canvas id="cx-${p.key}"></canvas>`;
+    wrap.appendChild(card);
+  }
+  drawAllGraphs();
+}
+function drawAllGraphs(){
+  if(!document.getElementById('tab-graphs').classList.contains('active')) return;
+  for(const p of PIDS){ if(p.graphOn && p.avail) drawChart(p); }
+}
+function drawChart(p){
+  const cv=document.getElementById('cx-'+p.key); if(!cv) return;
+  const dpr=window.devicePixelRatio||1;
+  const w=cv.clientWidth, h=cv.clientHeight;
+  if(cv.width!==w*dpr||cv.height!==h*dpr){ cv.width=w*dpr; cv.height=h*dpr; }
+  const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
+  const padL=44,padR=8,padT=8,padB=18;
+  const now=Date.now(), t0=now-GRAPH_WINDOW_MS;
+  const pts=p.samples.filter(s=>s.t>=t0).map(s=>({t:s.t, v:shownValue(p,s.v)}));
+  // current value label
+  const cvEl=document.getElementById('cv-'+p.key);
+  if(cvEl) cvEl.textContent = (p.value==null?'':(fmt(p,p.value)+' '+shownUnit(p)));
+  // axes background
+  g.fillStyle='#fbfcfe'; g.fillRect(padL,padT,w-padL-padR,h-padT-padB);
+  g.strokeStyle='#e3e9ef'; g.lineWidth=1;
+  g.beginPath(); g.moveTo(padL,padT); g.lineTo(padL,h-padB); g.lineTo(w-padR,h-padB); g.stroke();
+  if(pts.length<1){ return; }
+  let mn=Math.min(...pts.map(p=>p.v)), mx=Math.max(...pts.map(p=>p.v));
+  if(mn===mx){ mn-=1; mx+=1; } const pad=(mx-mn)*0.1; mn-=pad; mx+=pad;
+  const X=t=>padL+((t-t0)/GRAPH_WINDOW_MS)*(w-padL-padR);
+  const Y=v=>padT+(1-(v-mn)/(mx-mn))*(h-padT-padB);
+  // gridlines + Y labels (min / mid / max)
+  g.fillStyle='#8a97a3'; g.font='10px "Segoe UI",sans-serif'; g.textBaseline='middle';
+  [mx,(mx+mn)/2,mn].forEach(val=>{
+    const y=Y(val); g.strokeStyle='#eef2f6'; g.beginPath(); g.moveTo(padL,y); g.lineTo(w-padR,y); g.stroke();
+    g.fillStyle='#8a97a3'; g.textAlign='right'; g.fillText(val.toFixed(p.dec),padL-5,y);
+  });
+  g.textAlign='left'; g.textBaseline='alphabetic';
+  g.fillText('-60s',padL+1,h-6); g.textAlign='right'; g.fillText('now',w-padR,h-6);
+  // series line
+  g.strokeStyle='#1e6fc4'; g.lineWidth=2; g.beginPath();
+  pts.forEach((pt,i)=>{ const x=X(pt.t),y=Y(pt.v); i?g.lineTo(x,y):g.moveTo(x,y); });
+  g.stroke();
+  // last point marker
+  const last=pts[pts.length-1]; g.fillStyle='#12457e';
+  g.beginPath(); g.arc(X(last.t),Y(last.v),3,0,7); g.fill();
+}
+
+/* ===================================================================== *
+   Config persistence (the "saved settings" other apps lacked)
+   ===================================================================== */
+const CFG_KEY='td5pwa_cfg_v1';
+function saveConfig(){
+  const c={items:{}};
+  for(const p of PIDS) c.items[p.key]={display:p.display,graph:p.graphOn,unit:p.unitSel};
+  try{ localStorage.setItem(CFG_KEY,JSON.stringify(c)); }catch(e){}
+}
+function loadConfig(){
+  let c; try{ c=JSON.parse(localStorage.getItem(CFG_KEY)); }catch(e){}
+  if(!c||!c.items) return;
+  for(const p of PIDS){ const s=c.items[p.key]; if(!s) continue;
+    p.display=!!s.display; p.graphOn=!!s.graph; if(s.unit) p.unitSel=s.unit; }
+  // never exceed the graph cap
+  let n=0; for(const p of PIDS){ if(p.graphOn){ if(++n>MAX_GRAPHS) p.graphOn=false; } }
+}
+
+/* ===================================================================== *
+   Small helpers + wiring
+   ===================================================================== */
+function tok(s){ return (s||'').toUpperCase().split(/[^0-9A-F]+/).filter(Boolean); }
+function hex2(n){ return n.toString(16).toUpperCase().padStart(2,'0'); }
+function el(tag,cls){ const e=document.createElement(tag); if(cls)e.className=cls; return e; }
+function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+let toastTimer=null;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2600); }
+
+// Tabs
+const TAB_ORDER=['faults','avail','live','graphs'];
+function showTab(tab){
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active', x.dataset.tab===tab));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  const sec=document.getElementById('tab-'+tab); if(sec) sec.classList.add('active');
+  if(tab==='graphs') drawAllGraphs();
+  if(tab==='faults' && connected) readDtcs().catch(()=>{});
+}
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+
+// Swipe left/right to move between tabs (ignores vertical scrolls and small drags).
+(function(){
+  const main=document.querySelector('main');
+  let x0=null, y0=null;
+  main.addEventListener('touchstart',e=>{ const t=e.changedTouches[0]; x0=t.clientX; y0=t.clientY; },{passive:true});
+  main.addEventListener('touchend',e=>{
+    if(x0===null) return;
+    const t=e.changedTouches[0], dx=t.clientX-x0, dy=t.clientY-y0; x0=null;
+    if(Math.abs(dx)<60 || Math.abs(dx)<Math.abs(dy)*1.5) return;   // must be a clear horizontal swipe
+    const cur=TAB_ORDER.indexOf(document.querySelector('nav button.active').dataset.tab);
+    const next=cur+(dx<0?1:-1);
+    if(next>=0 && next<TAB_ORDER.length) showTab(TAB_ORDER[next]);
+  },{passive:true});
+})();
+// Buttons
+document.getElementById('connectBtn').addEventListener('click',()=>{ connected?disconnect():connect(true); });
+document.getElementById('readDtcBtn').addEventListener('click',()=>readDtcs());
+document.getElementById('clearDtcBtn').addEventListener('click',()=>clearDtcs());
+window.addEventListener('resize',()=>drawAllGraphs());
+
+// Initial paint (before connect) + attempt silent auto-reconnect.
+loadConfig(); renderAvail(); renderLive(); renderGraphs();
+window.addEventListener('load',()=>{ if(isNative() || (navigator.bluetooth&&navigator.bluetooth.getDevices)) connect(false); });
+</script>
+</body>
+</html>

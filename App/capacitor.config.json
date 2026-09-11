@@ -1,0 +1,8 @@
+{
+  "appId": "uk.co.psidesign.td5diag",
+  "appName": "Td5 Diagnostics",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  }
+}

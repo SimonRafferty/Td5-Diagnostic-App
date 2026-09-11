@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Td5 Diagnostics</string>
+    <string name="title_activity_main">Td5 Diagnostics</string>
+    <string name="package_name">uk.co.psidesign.td5diag</string>
+    <string name="custom_url_scheme">uk.co.psidesign.td5diag</string>
+</resources>
