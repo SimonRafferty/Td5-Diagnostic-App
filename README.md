@@ -3,7 +3,7 @@ An OBD2 Scanner for Td5 Land Rovers, Compatible with ELM327 with it's own Androi
 
 An OBD2 Scanner has become an essential part of most vehicle owners toolkit.  However, if you own a Land Rover Td5, your options are limited & expensive!
 
-NanoCom from BlackBox Solutions is the go-to for most people - but it is rather expensive.  If you want to re-map your engine, it's good value - but I suspect many users just want to be able to read live data, read and clear Diagnostic Trouble Codes (DTC's).  For any other vehicle, a simple ELM327 scanner and a phone app will cost peanuts - but no such, low cost, device exists for Td5 owners.  My intention with this project is to provide an option.
+NanoCom from BlackBox Solutions is the go-to for most people - but it is rather expensive.  If you want to re-map your engine, it's good value - but I suspect many users just want to be able to read live data, read and clear Diagnostic Trouble Codes (DTC's).  For any other vehicle, a simple ELM327 scanner and a phone app will costs next to nothing - but Td5 owners have to fork out £600+ for NanoCom.  My intention with this project is to provide a lower cost option.  One that I can leave in the Land Rover without having to worry that it will get wet / damaged / stolen.
 
 Along with the linked hardware (A K-Line Interface + ESP32S3), this emulates an ELM327 scanner when plugged into a Td5 Engine.  Use an app such as 'EOBD-Facile', connected via bluetooth low energy (BLE).  Unfortunately, it is not compatible with Torque which only uses Bluetooth 3 & that's not available on an ESP32S3.
 
@@ -13,26 +13,26 @@ Alternatively, install the APK in the repo - it's completely free & open source.
 
 ## Installing the App
 
-The app isn't on the Google Play Store just yet - I'll upload it there in due course to make installing and updating it a one-tap affair.  In the meantime you can "side-load" it directly, which only takes a minute:
+The app isn't on the Google Play Store yet - I'll upload it there in due course to make installing and updating it easy.  In the meantime you can "side-load" it directly, which only takes a minute:
 
 1. On your Android phone or tablet, download [**Td5-Diagnostics-debug.apk**](Td5-Diagnostics-debug.apk) from this repository (open the link, then tap the download button on that page).
 2. Open it from your Downloads.  Android will warn you it's from an "unknown source" - this is completely normal for any app installed outside the Play Store.
 3. Tap through to Settings on that prompt and allow "Install unknown apps" for your browser (or Files app), then go back and tap Install.
 4. Open Td5 Diagnostics, tap Connect, and choose "OBDII" from the list.
 
-Because this is a debug build it isn't signed for the Play Store, so that "unknown source" warning is expected and safe to accept.  Once the Play Store version is live you'll be able to install it the usual way.
+Because this is a debug build it isn't signed for the Play Store, so that "unknown source" warning is expected and safe to accept.  Once the Play Store version is live, I'll link to it from here.  Unfortunately it takes Google an age to verify & approve an app.
 
-## Running it in a Web Browser (no APK)
+## Running it in a Web Browser - Android or PC
 
-Besides the APK, the whole app is packaged as a single, self-contained web page - [**Td5-Diagnostic.html**](Td5-Diagnostic.html) - so it runs in any Chromium browser with Web Bluetooth (Chrome or Edge on Android or a PC).  Two ways to use it:
+The whole app is packaged as a single, self-contained web page - [**Td5-Diagnostic.html**](Td5-Diagnostic.html) - so it runs in any Chromium browser with Web Bluetooth (Chrome or Edge on Android or a PC).  Two ways to use it:
 
-- **Open it from a file.**  Download [Td5-Diagnostic.html](Td5-Diagnostic.html) onto your phone or PC and open it in Chrome.  It's one file with nothing else to fetch, and a local `file://` page counts as a secure context, so Web Bluetooth works with no hosting at all.  Tap Connect and choose "OBDII".
-- **Tap a hosted link.**  Enable GitHub Pages for this repository (Settings -> Pages -> Deploy from a branch -> `main`) and the same page is live at
+- **Open it from a file.**  Download [Td5-Diagnostic.html](Td5-Diagnostic.html) onto your phone or PC and open it in Chrome.  Then you will have a completely local copy you can access without internet connectivity.
+- **Tap a hosted link.**  Just click the link below (Chrome or Edge only) and the app will load in your browser.  Obviously, you will need internet for this.
   **https://simonrafferty.github.io/Td5-Diagnostic-App/Td5-Diagnostic.html**.
 
 ### iPhone and iPad
 
-Apple's Safari does not support Web Bluetooth, so it will not connect there.  Install the free **Bluefy** browser from the App Store and open the hosted link above in it (Bluefy loads a URL, so on iOS use the GitHub Pages option).  For a proper native iOS app, the Capacitor project can also target iOS (`npx cap add ios`, built in Xcode on a Mac) since the Bluetooth plugin supports iOS as well - I may add that in due course.
+Apple's Safari does not support Web Bluetooth, so it will not connect there.  Install the free **Bluefy** browser from the App Store and open **https://simonrafferty.github.io/Td5-Diagnostic-App/Td5-Diagnostic.html**.  
 
 ## What the App Does
 
@@ -49,7 +49,7 @@ There are four simple tabs - swipe left and right to move between them:
 |--------|----------|
 | `Firmware/` | The ESP32-S3 dongle firmware (Arduino).  This is what turns the K-Line interface into a BLE ELM327 that the app - and other OBD2 apps - can talk to. |
 | `App/` | The Android app project (built with Capacitor) used to produce the APK. |
-| `Hardware/` | Gerber files and PCB details for the K-Line interface.  I'll add these here myself. |
+| `Hardware/` | Gerber files and PCB details for the K-Line interface. |
 | [`Td5-Diagnostics-debug.apk`](Td5-Diagnostics-debug.apk) | The ready-to-install Android app. |
 | [`Td5-Diagnostic.html`](Td5-Diagnostic.html) | The whole app as a single, self-contained web page (browser use, or iOS via Bluefy). |
 
@@ -63,6 +63,5 @@ The dongle is an ESP32-S3 plus a simple K-Line interface (an L9637D transceiver 
 
 **App:** the app itself is an HTML file (`App/www/index.html`) plus a small Bluetooth bridge (`App/www/ble-shim.js`), wrapped up with Capacitor so it can run natively.  To rebuild the APK, run `npm install` in the `App` folder, then `npx cap sync android` and build with Android Studio (or Gradle).
 
-**Single-file web page:** run `npm run single` in the `App` folder to regenerate `Td5-Diagnostic.html` - it simply inlines `ble-shim.js` into `index.html` to produce the standalone page.
+**Single-file web page:** Download [Td5-Diagnostic.html](Td5-Diagnostic.html)
 
-On a fresh clone there is no `local.properties` file - it just tells Gradle where your machine's Android SDK lives, so it is deliberately left out of the repo.  Android Studio creates it for you automatically when you open the `App` folder, or you can add one yourself containing a single line: `sdk.dir=/path/to/your/Android/Sdk`.
