@@ -1,11 +1,11 @@
 /*
- * Td5_Torque.ino - Land Rover Td5 -> Torque (ELM327-over-WiFi) dongle
+ * Td5_Diagnostic.ino - Land Rover Td5 Diagnostic (ELM327) dongle
  * ===================================================================
  *
- * Presents the ESP32 as a WiFi ELM327 OBD-II adapter so the Torque app (and
- * other ELM327 apps) can display live data and read/clear fault codes.
+ * Presents the ESP32 as an ELM327 OBD-II adapter (over BLE or WiFi) so ELM327
+ * diagnostic apps can display live data and read/clear fault codes.
  *
- *   Phone  --WiFi-->  ESP32 SoftAP "Td5-Torque"  (192.168.0.10:35000)
+ *   Phone  --WiFi-->  ESP32 SoftAP "Td5-Diagnostic"  (192.168.0.10:35000)
  *          --TCP-->   WifiElmServer -> Elm327 -> ObdTranslator -> DataProvider
  *
  * Phase is chosen by ONE flag in config.h:
@@ -14,7 +14,7 @@
  *
  * Board: Seeed XIAO ESP32-S3   FQBN: esp32:esp32:XIAO_ESP32S3
  *
- * See README_SETUP.md for Torque configuration and Td5_Torque_PIDs.csv for the
+ * See README_SETUP.md for setup and Td5_Diagnostic_PIDs.csv for the
  * importable custom-PID definitions.
  */
 
@@ -58,7 +58,7 @@ void setup() {
   Serial.setTxTimeoutMs(0);   // never block on debug prints if no USB reader attached
   delay(300);
   Serial.println();
-  Serial.println(F("=== Td5 -> Torque (ELM327 over WiFi) ==="));
+  Serial.println(F("=== Td5 Diagnostic (ELM327 over WiFi) ==="));
 #if DATA_SOURCE_SIM
   Serial.println(F("Data source: SIMULATED (Phase 1 bench)"));
 #else

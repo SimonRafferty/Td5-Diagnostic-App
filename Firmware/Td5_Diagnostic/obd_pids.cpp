@@ -268,7 +268,7 @@ String ObdTranslator::mode09(uint8_t /*pid*/) {
 // ---------------------------------------------------------------------------
 // Mode 22 - Td5 custom PIDs (ReadDataByIdentifier), DIDs 0xF0xx
 // Response: "62 <DID hi> <DID lo> <data...>". Equations live in the shipped
-// Td5_Torque_PIDs.csv so the app can decode them.
+// Td5_Diagnostic_PIDs.csv so the app can decode them.
 // ---------------------------------------------------------------------------
 
 String ObdTranslator::mode22(uint16_t did) {

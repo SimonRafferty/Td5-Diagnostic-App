@@ -15,7 +15,7 @@ Alternatively, install the APK in the repo - it's completely free & open source.
 
 The app isn't on the Google Play Store just yet - I'll upload it there in due course to make installing and updating it a one-tap affair.  In the meantime you can "side-load" it directly, which only takes a minute:
 
-1. On your Android phone or tablet, download **Td5-Diagnostics-debug.apk** from this repository (tap the file in the list above, then the download button).
+1. On your Android phone or tablet, download [**Td5-Diagnostics-debug.apk**](Td5-Diagnostics-debug.apk) from this repository (open the link, then tap the download button on that page).
 2. Open it from your Downloads.  Android will warn you it's from an "unknown source" - this is completely normal for any app installed outside the Play Store.
 3. Tap through to Settings on that prompt and allow "Install unknown apps" for your browser (or Files app), then go back and tap Install.
 4. Open Td5 Diagnostics, tap Connect, and choose "OBDII" from the list.
@@ -50,7 +50,7 @@ There are four simple tabs - swipe left and right to move between them:
 | `Firmware/` | The ESP32-S3 dongle firmware (Arduino).  This is what turns the K-Line interface into a BLE ELM327 that the app - and other OBD2 apps - can talk to. |
 | `App/` | The Android app project (built with Capacitor) used to produce the APK. |
 | `Hardware/` | Gerber files and PCB details for the K-Line interface.  I'll add these here myself. |
-| `Td5-Diagnostics-debug.apk` | The ready-to-install Android app. |
+| [`Td5-Diagnostics-debug.apk`](Td5-Diagnostics-debug.apk) | The ready-to-install Android app. |
 
 ## The Hardware
 
@@ -58,7 +58,7 @@ The dongle is an ESP32-S3 plus a simple K-Line interface (an L9637D transceiver 
 
 ## Building From Source
 
-**Firmware:** open `Firmware/Td5_Torque/Td5_Torque.ino` in the Arduino IDE, select the **XIAO_ESP32S3** board and upload.  The only extra library you'll need is *EspSoftwareSerial*.
+**Firmware:** open `Firmware/Td5_Diagnostic/Td5_Diagnostic.ino` in the Arduino IDE, select the **XIAO_ESP32S3** board and upload.  The only extra library you'll need is *EspSoftwareSerial*.
 
 **App:** the app itself is a single, self-contained HTML file (`App/www/index.html`) wrapped up with Capacitor so it can run natively and use the phone's Bluetooth.  To rebuild the APK, run `npm install` in the `App` folder, then `npx cap sync android` and build with Android Studio (or Gradle).
 

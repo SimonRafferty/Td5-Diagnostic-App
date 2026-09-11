@@ -13,7 +13,7 @@ read/clear fault codes.
 |---|---|---|
 | Phone keeps internet | **Yes** (online DTC lookup works) | No (phone joins the dongle AP) |
 | Best apps | Car Scanner, OBD Fusion (BLE-native); Torque *maybe* | Torque (rock-solid), any ELM327 app |
-| Advertises as | `OBDII` (service FFF0 / FFF1 notify / FFF2 write) | SSID `Td5-Torque` @ 192.168.0.10:35000 |
+| Advertises as | `OBDII` (service FFF0 / FFF1 notify / FFF2 write) | SSID `Td5-Diagnostic` @ 192.168.0.10:35000 |
 
 **Default build = BLE only** (so the phone stays online). Set `ENABLE_WIFI_ELM 1`
 (and `ENABLE_BLE_ELM 0`) to fall back to the guaranteed-Torque WiFi path. You can
@@ -47,7 +47,7 @@ enable both, but for the keep-internet goal run BLE-only and do **not** join the
    phone keeps its internet for online DTC descriptions.
 3. **Torque**: not supported over BLE on this board (Classic-SPP only — see note
    above). Use the WiFi build for Torque.
-4. **Custom Td5 PIDs**: the mode-22 DIDs in `Td5_Torque_PIDs.csv` (e.g. `22F001`
+4. **Custom Td5 PIDs**: the mode-22 DIDs in `Td5_Diagnostic_PIDs.csv` (e.g. `22F001`
    injection qty, `22F002` boost) can be imported (OBD Fusion) or hand-entered
    (Car Scanner) using the same Mode+PID and equations listed there.
 
@@ -58,8 +58,8 @@ enable both, but for the keep-internet goal run BLE-only and do **not** join the
 Board: **Seeed XIAO ESP32-S3** (`esp32:esp32:XIAO_ESP32S3`).
 
 ```bash
-arduino-cli compile --fqbn esp32:esp32:XIAO_ESP32S3 Td5_ESPNow_Torque/Td5_Torque
-arduino-cli upload  --fqbn esp32:esp32:XIAO_ESP32S3 -p <PORT> Td5_ESPNow_Torque/Td5_Torque
+arduino-cli compile --fqbn esp32:esp32:XIAO_ESP32S3 Td5_ESPNow_Torque/Td5_Diagnostic
+arduino-cli upload  --fqbn esp32:esp32:XIAO_ESP32S3 -p <PORT> Td5_ESPNow_Torque/Td5_Diagnostic
 ```
 
 Open the serial monitor at **115200** — it prints the SoftAP status and every
@@ -71,7 +71,7 @@ ELM327 command/response, which is invaluable while debugging.
 
 Before touching the phone, prove the emulator answers correctly:
 
-1. On a PC, join the WiFi network **`Td5-Torque`** (password `landrover`).
+1. On a PC, join the WiFi network **`Td5-Diagnostic`** (password `landrover`).
 2. Open a raw TCP connection to `192.168.0.10` port `35000`, e.g.
    - `ncat 192.168.0.10 35000`  (or PuTTY → Raw → 192.168.0.10 : 35000)
 3. Type these (each followed by Enter) and check the replies:
@@ -96,7 +96,7 @@ Every reply ends with a `>` prompt. If this works, Torque will too.
 
 ## 3. Torque configuration
 
-1. On the phone, join WiFi **`Td5-Torque`** (password `landrover`).
+1. On the phone, join WiFi **`Td5-Diagnostic`** (password `landrover`).
    *(The phone loses internet while on this network — that's normal; Torque
    works fully offline.)*
 2. Torque → **Settings → OBD2 Adapter Settings → Connection Type → WiFi**.
@@ -109,7 +109,7 @@ Every reply ends with a `>` prompt. If this works, Torque will too.
 
 To see Td5-specific data (injection quantity, boost, EGR, etc.):
 
-1. Copy **`Td5_Torque_PIDs.csv`** to the phone (e.g. into `…/.torque/extendedpids/`).
+1. Copy **`Td5_Diagnostic_PIDs.csv`** to the phone (e.g. into `…/.torque/extendedpids/`).
 2. Torque → **Settings → Manage extra PIDs/Sensors → menu → Add predefined set**
    (or **Import**) → select the CSV.
 3. Add the new sensors to a dashboard.
@@ -162,7 +162,7 @@ so the OBD layer never deals with Td5 raw scaling.
 
 | Setting | Value |
 |---------|-------|
-| SSID | `Td5-Torque` |
+| SSID | `Td5-Diagnostic` |
 | Password | `landrover` (set `AP_PASS ""` for an open AP) |
 | IP | `192.168.0.10` |
 | Port | `35000` |

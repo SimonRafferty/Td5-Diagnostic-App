@@ -1,5 +1,5 @@
 /*
- * config.h - Build-time configuration for the Td5 -> Torque ELM327 dongle
+ * config.h - Build-time configuration for the Td5 Diagnostic ELM327 dongle
  *
  * ONE FLAG controls the whole build phase:
  *   DATA_SOURCE_SIM 1  -> Phase 1 (bench): synthetic data, no ECU needed
@@ -44,7 +44,7 @@
 // ---------------------------------------------------------------------------
 // Torque's WiFi OBD default is IP 192.168.0.10, port 35000. We match that so
 // the user only has to pick "Bluetooth/WiFi -> WiFi" in Torque with defaults.
-#define AP_SSID           "Td5-Torque"
+#define AP_SSID           "Td5-Diagnostic"
 #define AP_PASS           "landrover"    // >= 8 chars for WPA2; "" for an open AP
 #define AP_CHANNEL        6
 // Number of WiFi *associations* the AP allows. Must be >1 so a debug PC and the
