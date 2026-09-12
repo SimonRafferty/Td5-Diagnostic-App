@@ -67,7 +67,7 @@ The dongle is an ESP32-S3 plus a simple K-Line interface (an L9637D transceiver 
 
 - **PCB** - send [`Td5_OBD2_Gerber.zip`](Hardware/Td5_OBD2_Gerber.zip) to any board house to have the board made.
 - **Assembly** - [`Td5_OBD2_BOM.csv`](Hardware/Td5_OBD2_BOM.csv) (bill of materials) and [`Td5_OBD2_PickAndPlace.xlsx`](Hardware/Td5_OBD2_PickAndPlace.xlsx).
-- **Design source** - the full [schematic (PDF)](Hardware/Td5_OBD2_Scematic.pdf) and the editable [Altium project](Hardware/Td5_OBD2_Altium.zip).
+- **Design source** - the full [schematic (PDF)](Hardware/Td5_OBD2_Schematic.pdf) and the editable [Altium project](Hardware/Td5_OBD2_Altium.zip).
 - **Enclosure** - two 3D-printable case halves: [left](Hardware/Dongle%203D%20Print%20Shell%20Left.STEP) and [right](Hardware/Dongle%203D%20Print%20Shell%20Right.STEP) (STEP).
 
 ## Building From Source
