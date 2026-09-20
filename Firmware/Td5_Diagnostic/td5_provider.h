@@ -19,6 +19,7 @@
 
 #include "data_provider.h"
 #include "td5comm.h"
+#include "fuel_economy.h"
 
 class Td5Provider : public DataProvider {
 public:
@@ -32,6 +33,7 @@ public:
 private:
   Td5Comm     _td5;
   VehicleData _d {};
+  FuelEconomy _fuelEco;   // rolling 10-mile economy, NVS-persisted
 
   // Demo fallback: if no real ECU has ever answered and we've waited a bit,
   // serve synthetic data so the app/BLE path can be exercised without a vehicle.
@@ -57,6 +59,7 @@ private:
   void          pollStep();      // one iteration of connect/keep-alive/poll
 
   void pollNext();               // poll one live-data PID into the buffer
+  void readEcuIdentity();        // one-shot VIN + map/fuel/homologation after connect
   bool refreshDtcBuffer();       // read fault codes into the buffer (paced)
   bool doClear();                // transmit clear-faults (paced)
   void buildDtc(int rawIndex, DtcEntry& e);

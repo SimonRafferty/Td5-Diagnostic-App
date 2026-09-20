@@ -9,9 +9,10 @@
     "single": "node build-single.mjs"
   },
   "dependencies": {
+    "@capacitor-community/bluetooth-le": "^6.0.1",
     "@capacitor/android": "^6.2.0",
     "@capacitor/core": "^6.2.0",
-    "@capacitor-community/bluetooth-le": "^6.0.1"
+    "@capacitor/filesystem": "^6.0.4"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.2.0",

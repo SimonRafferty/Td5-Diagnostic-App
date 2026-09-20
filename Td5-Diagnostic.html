@@ -132,6 +132,13 @@
 <main>
   <!-- FAULT CODES ------------------------------------------------------- -->
   <section id="tab-faults" class="tab active">
+    <div class="card" id="ecuInfoCard" style="display:none">
+      <h2>Vehicle</h2>
+      <div class="small"><b>VIN:</b> <span id="ecuVin">—</span></div>
+      <div class="small"><b>Map:</b> <span id="ecuMap">—</span> &nbsp;·&nbsp;
+        <b>Fuel:</b> <span id="ecuFuel">—</span> &nbsp;·&nbsp;
+        <b>Homolog:</b> <span id="ecuHom">—</span></div>
+    </div>
     <div class="card">
       <div class="mil">
         <span class="muted">Malfunction indicator (MIL):</span>
@@ -153,6 +160,17 @@
   <section id="tab-avail" class="tab">
     <div class="card">
       <h2>Available data</h2>
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:2px 0 6px">
+        <label style="display:flex; align-items:center; gap:8px; font-weight:600">
+          <input type="checkbox" id="logChk" style="width:18px; height:18px; accent-color:var(--blue-2)">
+          Log displayed items to CSV
+        </label>
+        <button id="dlLogBtn" class="secondary" style="padding:6px 12px">Download log now</button>
+      </div>
+      <p class="hint" id="logHint">Logs the items you've ticked for <b>Display</b>, one timestamped row per
+        sweep, in your selected units. In the app it streams to the phone's <b>Documents</b> folder as
+        <code>Td5_Log_&lt;date&gt;_&lt;time&gt;.csv</code>; in a browser it downloads on stop or via
+        <b>Download log now</b>. Untick to stop.</p>
       <p class="hint">Tick <b>Display</b> to show a value on the Live Data tab, <b>Graph</b> to chart it
       (up to 4). Choose units per item. Selections are remembered.</p>
       <div id="availList"></div>
@@ -213,8 +231,15 @@ const U = {
   bar:   {native:'bar',  alt:'psi',  conv:BAR2P, uk:'imperial'},
   pct:   {native:'%'}, gps:{native:'g/s'}, volt:{native:'V'},
   sec:   {native:'s'}, mg:{native:'mg'}, gear:{native:''}, bits:{native:''}, raw:{native:''},
-  apairs:{native:''}, trim:{native:''}
+  apairs:{native:''}, trim:{native:''},
+  mpg:   {native:'mpg'}, l100:{native:'L/100km'}, litre:{native:'L'}
 };
+
+/* Bit-flag labels for the U.bits render. MUST be defined BEFORE the PID
+   catalogue: an mkc() entry passes RELAY_FLAGS at array-init time, and `const`
+   is not hoisted (referencing it earlier throws and kills the whole script). */
+const STATUS_FLAGS = ['Brake','Clutch','Cruise Master','Cruise Set','Cruise Resume','A/C','Transfer Hi']; // F00D bit0..6
+const RELAY_FLAGS = ['Main Relay','Fuel Pump','Glow Light','Glow Relay','MIL','Rad Fan','A/C Clutch','Ignition','Security']; // F01A bit0..8
 
 /* ---- PID catalogue --------------------------------------------------- *
    d = array of data bytes (the bytes after the "41 XX" / "62 F0 XX" prefix).
@@ -233,38 +258,58 @@ const PIDS = [
   mk('run',   'Run Time',           '011F', '411F', 2, d=>d[0]*256+d[1],            U.sec,  0, true,  0x00, 0x1F),
   mk('volt',  'Module Voltage',     '0142', '4142', 2, d=>(d[0]*256+d[1])/1000,     U.volt, 1, true,  0x40, 0x42),
   // Td5 custom (mode 22, DIDs F001..F00D)
-  mkc('inj',  'Td5 Injection Qty',  '22F001','62F001', 2, d=>(d[0]*256+d[1])/100,   U.mg,   1, true),
-  mkc('boost','Td5 Boost',          '22F002','62F002', 2, d=>((d[0]*256+d[1])/1000)-1, U.bar,2, true),
-  mkc('fuelt','Td5 Fuel Temp',      '22F003','62F003', 1, d=>d[0]-40,               U.degC, 0, true),
-  mkc('tmaf', 'Td5 MAF Air Mass',   '22F004','62F004', 2, d=>(d[0]*256+d[1])/100,   U.gps,  1, true),
-  mkc('trq',  'Td5 Torque Limit',   '22F005','62F005', 2, d=>(d[0]*256+d[1])/100,   U.mg,   1, true),
-  mkc('smk',  'Td5 Smoke Limit',    '22F006','62F006', 2, d=>(d[0]*256+d[1])/100,   U.mg,   1, true),
-  mkc('egr',  'Td5 EGR Position',   '22F007','62F007', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
-  mkc('wg',   'Td5 Wastegate Pos',  '22F008','62F008', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
-  mkc('gear', 'Td5 Selected Gear',  '22F009','62F009', 1, d=>d[0],                  U.gear, 0, true),
-  mkc('at1',  'Td5 Accel Track 1',  '22F00A','62F00A', 2, d=>(d[0]*256+d[1])/1000,  U.volt, 2, true),
-  mkc('at2',  'Td5 Accel Track 2',  '22F00B','62F00B', 2, d=>(d[0]*256+d[1])/1000,  U.volt, 2, true),
-  mkc('dem',  'Td5 Driver Demand',  '22F00C','62F00C', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
-  mkc('at3',  'Td5 Accel Track 3',  '22F00E','62F00E', 2, d=>(d[0]*256+d[1])/1000,  U.volt, 2, true),
-  mkc('vref', 'Td5 Accel Supply (5V)','22F010','62F010', 2, d=>(d[0]*256+d[1])/1000,U.volt, 2, true),
-  mkc('stat', 'Td5 Input Switches', '22F00D','62F00D', 1, d=>d[0],                  U.bits, 0, false),
-  mkc('inj1', 'Td5 Injector 1 Fuelling','22F013','62F013',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
-  mkc('inj2', 'Td5 Injector 2 Fuelling','22F014','62F014',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
-  mkc('inj3', 'Td5 Injector 3 Fuelling','22F015','62F015',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
-  mkc('inj4', 'Td5 Injector 4 Fuelling','22F016','62F016',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
-  mkc('inj5', 'Td5 Injector 5 Fuelling','22F017','62F017',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true)
+  mkc('inj',  'Injection Qty',  '22F001','62F001', 2, d=>(d[0]*256+d[1])/100,   U.mg,   1, true),
+  mkc('boost','Boost',          '22F002','62F002', 2, d=>((d[0]*256+d[1])/1000)-1, U.bar,2, true),
+  mkc('fuelt','Fuel Temp',      '22F003','62F003', 1, d=>d[0]-40,               U.degC, 0, true),
+  mkc('tmaf', 'MAF Air Mass',   '22F004','62F004', 2, d=>(d[0]*256+d[1])/100,   U.gps,  1, true),
+  mkc('trq',  'Torque Limit',   '22F005','62F005', 2, d=>(d[0]*256+d[1])/100,   U.mg,   1, true),
+  mkc('smk',  'Smoke Limit',    '22F006','62F006', 2, d=>(d[0]*256+d[1])/100,   U.mg,   1, true),
+  mkc('egr',  'EGR Position',   '22F007','62F007', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
+  mkc('wg',   'Wastegate Pos',  '22F008','62F008', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
+  mkc('gear', 'Selected Gear',  '22F009','62F009', 1, d=>d[0],                  U.gear, 0, true),
+  mkc('at1',  'Accel Track 1',  '22F00A','62F00A', 2, d=>(d[0]*256+d[1])/1000,  U.volt, 2, true),
+  mkc('at2',  'Accel Track 2',  '22F00B','62F00B', 2, d=>(d[0]*256+d[1])/1000,  U.volt, 2, true),
+  mkc('dem',  'Driver Demand',  '22F00C','62F00C', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
+  mkc('at3',  'Accel Track 3',  '22F00E','62F00E', 2, d=>(d[0]*256+d[1])/1000,  U.volt, 2, true),
+  mkc('vref', 'Accel Supply (5V)','22F010','62F010', 2, d=>(d[0]*256+d[1])/1000,U.volt, 2, true),
+  mkc('stat', 'Input Switches', '22F00D','62F00D', 1, d=>d[0],                  U.bits, 0, false),
+  mkc('inj1', 'Injector 1 Fuelling','22F013','62F013',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
+  mkc('inj2', 'Injector 2 Fuelling','22F014','62F014',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
+  mkc('inj3', 'Injector 3 Fuelling','22F015','62F015',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
+  mkc('inj4', 'Injector 4 Fuelling','22F016','62F016',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
+  mkc('inj5', 'Injector 5 Fuelling','22F017','62F017',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
+  // MEMSTools-derived additions (2026-09-20): new PIDs 0x45/0x21/0x1C/0x1A/0x36
+  mkc('egri', 'EGR Inlet Throttle','22F019','62F019',2,d=>(d[0]*256+d[1])/100, U.pct, 1, true),
+  mkc('idle', 'Idle Speed Error', '22F018','62F018',2,d=>((d[0]<<8|d[1])<<16>>16),U.rpm,0,true),
+  mkc('mapd', 'MAP Direct',       '22F01F','62F01F',2,d=>(d[0]*256+d[1])/100, U.kpa, 0, true),
+  mkc('csv',  'Coolant Sensor V', '22F01B','62F01B',2,d=>(d[0]*256+d[1])/1000,U.volt,2,false),
+  mkc('iatv', 'Inlet Air Sensor V','22F01C','62F01C',2,d=>(d[0]*256+d[1])/1000,U.volt,2,false),
+  mkc('ftv',  'Fuel Sensor V',    '22F01D','62F01D',2,d=>(d[0]*256+d[1])/1000,U.volt,2,false),
+  mkc('mafv', 'MAF Sensor V',     '22F01E','62F01E',2,d=>(d[0]*256+d[1])/1000,U.volt,2,false),
+  mkc('outs', 'Output/Relay Status','22F01A','62F01A',2,d=>(d[0]*256+d[1]),   U.bits,0,false,RELAY_FLAGS),
+  // Fuel economy (derived; 10-mile rolling window persisted in the dongle's NVS)
+  mkc('ampg', 'Avg MPG (10 mi)',   '22F025','62F025',2,d=>(d[0]*256+d[1])/10, U.mpg,  1, true),
+  mkc('impg', 'Instant MPG',       '22F026','62F026',2,d=>(d[0]*256+d[1])/10, U.mpg,  1, true),
+  mkc('al100','Avg L/100km (10 mi)','22F027','62F027',2,d=>(d[0]*256+d[1])/10,U.l100, 1, true),
+  mkc('trip', 'Trip Fuel Used',    '22F028','62F028',2,d=>(d[0]*256+d[1])/100,U.litre,2, true),
+  // Completeness: direct-reading duplicates + pedal type + gearbox neutral
+  mkc('bvd',  'Battery Direct',    '22F029','62F029',2,d=>(d[0]*256+d[1])/1000,U.volt,2, true),
+  mkc('apd',  'Ambient Direct',    '22F02A','62F02A',2,d=>(d[0]*256+d[1])/100, U.kpa, 1, true),
+  mkc('ptk',  'Pedal Tracks',      '22F02B','62F02B',1,d=>d[0],                U.gear,0, false),
+  mkc('gbn',  'Gearbox Neutral',   '22F02C','62F02C',1,d=>d[0],                U.bits,0, false,['Neutral'])
 ];
 function mk(key,name,cmd,prefix,bytes,decode,unit,dec,graph,range,bit){
   return {key,name,cmd,prefix,bytes,decode,unit,dec,graph,std:true,range,bit,
           avail:false, display:false, graphOn:false, unitSel:unit.uk||'metric',
           value:null, samples:[]};
 }
-function mkc(key,name,cmd,prefix,bytes,decode,unit,dec,graph){
-  return {key,name,cmd,prefix,bytes,decode,unit,dec,graph,std:false,
+function mkc(key,name,cmd,prefix,bytes,decode,unit,dec,graph,flags){
+  return {key,name,cmd,prefix,bytes,decode,unit,dec,graph,std:false,flags:flags||null,
           avail:true, display:false, graphOn:false, unitSel:unit.uk||'metric',
           value:null, samples:[]};
 }
-const STATUS_FLAGS = ['Brake','Clutch','Cruise Master','Cruise Set','Cruise Resume','A/C','Transfer Hi']; // F00D bit0..6
+// STATUS_FLAGS / RELAY_FLAGS are declared above (before the PID catalogue),
+// because an mkc() entry references RELAY_FLAGS at array-initialisation time.
 
 /* ---- Td5 fault table (full, generated from td5_dtc_table.h): [X, Y, desc, pcode] */
 const TD5_DTC_TABLE = [
@@ -489,7 +534,7 @@ function dtcInfo(code){
   const hex = parseInt(code.slice(1),16);
   if (code[0]==='P' && hex>=0x1000 && hex<=0x1000+279){
     const raw=hex-0x1000, x=(raw>>3)+1, y=(raw&7)+1, d=TD5_XY[x+'-'+y];
-    return { desc: d||('Undefined Td5 fault bit '+x+'-'+y), tag:'Td5 '+x+'-'+y };
+    return { desc: d||('Undefined Td5 fault bit '+x+'-'+y), tag:''+x+'-'+y };
   }
   return { desc: PCODE_DESC[code]||'Manufacturer-specific code', tag:code };
 }
@@ -603,13 +648,16 @@ async function connectNative(fromClick){
 async function afterConnect(name){
   connected=true; chain=Promise.resolve();
   statusUI('on', name); toast('Connected');
-  await initAndDiscover(); startPolling();
+  await initAndDiscover();
+  readEcuInfo().catch(()=>{});     // VIN + map name (static, read once)
+  startPolling();
   readDtcs().catch(()=>{});
   setTimeout(()=>{ if(connected) readDtcs().catch(()=>{}); }, 3500);  // buffer fills shortly after connect
 }
 
 function onDisconnected(){
   connected=false; writeChar=null; notifyChar=null;
+  if(logging){ stopLog(); const c=document.getElementById('logChk'); if(c) c.checked=false; }
   statusUI('off','Disconnected'); toast('Dongle disconnected');
   // No auto-reconnect here - auto-connect happens ONLY at app start. After a
   // manual Disconnect (or a dropout) the user taps Connect to reconnect.
@@ -659,13 +707,99 @@ function bitSet(bytes,n){
 }
 
 /* ===================================================================== *
+   CSV logging (native app only) - writes to the public Documents folder via
+   the Capacitor Filesystem plugin. One header + a row per poll sweep, in the
+   user's selected units. File: Td5_Log_<date>_<time>.csv.
+   ===================================================================== */
+let logging=false, logFile=null, logCols=null, logBuf='';
+function fsPlugin(){ return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem; }
+// Some Android versions (10-12) need the public-storage permission to write to
+// Documents; Android 13+ grants it for app-created files. Best-effort: request
+// it if not already granted (no-op / harmless where the OS doesn't require it).
+async function ensureFsPermission(FS){
+  try{
+    if(FS && FS.checkPermissions){
+      const st=await FS.checkPermissions();
+      if(st && st.publicStorage && st.publicStorage!=='granted' && FS.requestPermissions){
+        await FS.requestPermissions();
+      }
+    }
+  }catch(e){ /* plugin may declare no runtime permission on this OS - ignore */ }
+}
+function pad2(n){ return String(n).padStart(2,'0'); }
+function stampParts(){ const d=new Date();
+  return { date:`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`,
+           time:`${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}` }; }
+function fnameStamp(){ const p=stampParts(); return p.date+'_'+p.time.replace(/:/g,'-'); }
+function csvCol(p){ const u=shownUnit(p); const n=u ? (p.name+' ('+u+')') : p.name;
+  return '"'+n.replace(/"/g,'""')+'"'; }
+
+async function startLog(){
+  const chk=document.getElementById('logChk');
+  if(!connected){ toast('Connect first'); if(chk) chk.checked=false; return; }
+  logCols=PIDS.filter(p=>p.avail && p.display);
+  if(!logCols.length){ toast('Tick some items to Display first, then enable logging'); if(chk) chk.checked=false; return; }
+  logFile='Td5_Log_'+fnameStamp()+'.csv';
+  let header='Time'; for(const p of logCols) header+=','+csvCol(p);
+  const FS=fsPlugin();
+  if(FS){                                   // native app: stream rows to a file in Documents
+    await ensureFsPermission(FS);           // prompt for storage permission where required
+    try{
+      await FS.writeFile({path:logFile, data:header+'\n', directory:'DOCUMENTS', encoding:'utf8', recursive:true});
+      logBuf=''; logging=true; toast('Logging to Documents/'+logFile);
+    }catch(e){ logging=false; if(chk) chk.checked=false; toast('Log start failed: '+(e.message||e)); }
+  }else{                                    // browser/PWA: buffer in memory, download on stop / on demand
+    logBuf=header+'\n'; logging=true; toast('Logging - use "Download log now" or untick to save');
+  }
+}
+function stopLog(){
+  if(!logging) return; logging=false;
+  if(fsPlugin()) toast('Log saved: Documents/'+(logFile||''));
+  else { toast('Log stopped - downloading'); downloadNow(); }   // browser: auto-download on stop
+}
+async function logRow(){
+  if(!logging || !logCols) return;
+  const t=stampParts(); let row=t.date+' '+t.time;
+  for(const p of logCols){
+    let cell='';
+    if(p.value!==null && p.value!==undefined){
+      if(p.unit===U.bits) cell=String(p.value|0);
+      else { const v=shownValue(p,p.value); cell=(v!==null && isFinite(v)) ? v.toFixed(p.dec) : ''; }
+    }
+    row+=','+cell;
+  }
+  const FS=fsPlugin();
+  if(FS){
+    try{ await FS.appendFile({path:logFile, data:row+'\n', directory:'DOCUMENTS', encoding:'utf8'}); }
+    catch(e){ logging=false; const chk=document.getElementById('logChk'); if(chk) chk.checked=false;
+              toast('Log write failed: '+(e.message||e)); }
+  }else{
+    logBuf+=row+'\n';                        // browser: accumulate for download
+  }
+}
+// Manual export. Native: file is already saved (toast the path). Browser: download the buffer.
+function downloadNow(){
+  if(fsPlugin()){
+    toast(logFile ? ('Saved to Documents/'+logFile) : 'Logging saves to Documents automatically');
+    return;
+  }
+  if(!logBuf || logBuf.indexOf('\n')<0){ toast('No log data yet'); return; }
+  const blob=new Blob([logBuf],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url;
+  a.download=logFile || ('Td5_Log_'+fnameStamp()+'.csv');
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1500);
+}
+
+/* ===================================================================== *
    Polling loop
    ===================================================================== */
 let polling=false;
 async function startPolling(){
   if(polling) return; polling=true;
   while(connected){
-    const items=PIDS.filter(p=>p.avail && (p.display||p.graphOn));
+    const items=PIDS.filter(p=>p.avail && (p.display || p.graphOn));
     if(!items.length){ await sleep(200); continue; }
     for(const p of items){
       if(!connected) break;
@@ -681,6 +815,7 @@ async function startPolling(){
       updateLiveCell(p);
     }
     drawAllGraphs();
+    if(logging) await logRow();          // one CSV row per completed sweep
   }
   polling=false;
 }
@@ -764,6 +899,43 @@ function renderDtcs(mil,cnt,codes){
 }
 
 /* ===================================================================== *
+   ECU identity (VIN / map name) - read once on connect via ASCII DIDs
+   ===================================================================== */
+async function readAsciiDid(cmd, prefix){
+  const r = await send(cmd);
+  if(!r || /NO DATA|TIMEOUT|ERR|\?/i.test(r)) return '';
+  const t = tok(r);
+  const pre = prefix.match(/../g);                 // e.g. ['62','F0','24']
+  let start=-1;
+  for(let i=0;i+pre.length<=t.length;i++){
+    let ok=true;
+    for(let k=0;k<pre.length;k++){ if((t[i+k]||'')!==pre[k]){ ok=false; break; } }
+    if(ok){ start=i+pre.length; break; }
+  }
+  if(start<0) return '';
+  let s='';
+  for(let k=start;k<t.length;k++){
+    const b=parseInt(t[k],16);
+    if(isNaN(b)||b===0) break;
+    if(b>=32 && b<127) s+=String.fromCharCode(b);
+  }
+  return s.trim();
+}
+async function readEcuInfo(){
+  const vin  = await readAsciiDid('22F024','62F024');
+  const map  = await readAsciiDid('22F021','62F021');
+  const fuel = await readAsciiDid('22F022','62F022');
+  const hom  = await readAsciiDid('22F023','62F023');
+  renderEcuInfo({vin,map,fuel,hom});
+}
+function renderEcuInfo(info){
+  const card=document.getElementById('ecuInfoCard'); if(!card) return;
+  card.style.display = (info.vin||info.map||info.fuel||info.hom) ? 'block' : 'none';
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.textContent = v||'—'; };
+  set('ecuVin',info.vin); set('ecuMap',info.map); set('ecuFuel',info.fuel); set('ecuHom',info.hom);
+}
+
+/* ===================================================================== *
    Available Data tab
    ===================================================================== */
 function renderAvail(){
@@ -839,8 +1011,9 @@ function updateLiveCell(p){
   const cell=document.getElementById('live-'+p.key); if(!cell) return;
   const body=cell.querySelector('.body');
   if(p.unit===U.bits){
+    const labels=p.flags||STATUS_FLAGS;
     const bits=(p.value|0); let html='<div class="flags">';
-    STATUS_FLAGS.forEach((f,i)=>{ html+=`<span class="flag${(bits>>i)&1?' on':''}">${f}</span>`; });
+    labels.forEach((f,i)=>{ html+=`<span class="flag${(bits>>i)&1?' on':''}">${f}</span>`; });
     body.innerHTML=html+'</div>'; return;
   }
   if(p.unit===U.apairs){
@@ -987,11 +1160,18 @@ document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()
 document.getElementById('connectBtn').addEventListener('click',()=>{ connected?disconnect():connect(true); });
 document.getElementById('readDtcBtn').addEventListener('click',()=>readDtcs());
 document.getElementById('clearDtcBtn').addEventListener('click',()=>clearDtcs());
+document.getElementById('logChk').addEventListener('change',e=>{ e.target.checked ? startLog() : stopLog(); });
+document.getElementById('dlLogBtn').addEventListener('click',()=>downloadNow());
 window.addEventListener('resize',()=>drawAllGraphs());
 
 // Initial paint (before connect) + attempt silent auto-reconnect.
 loadConfig(); renderAvail(); renderLive(); renderGraphs();
-window.addEventListener('load',()=>{ if(isNative() || (navigator.bluetooth&&navigator.bluetooth.getDevices)) connect(false); });
+window.addEventListener('load',()=>{
+  // "Download log now" only does something in a browser (the app streams to
+  // Documents already), so hide it in the native app.
+  if(fsPlugin()){ const b=document.getElementById('dlLogBtn'); if(b) b.style.display='none'; }
+  if(isNative() || (navigator.bluetooth&&navigator.bluetooth.getDevices)) connect(false);
+});
 </script>
 </body>
 </html>

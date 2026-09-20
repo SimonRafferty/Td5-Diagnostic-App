@@ -85,12 +85,17 @@ const unsigned char pid_0x12[] = { 0x02, 0x3E, 0x01, 0x00 };              // KEE
 const unsigned char pid_0x13[] = { 0x02, 0x21, 0x3B, 0x00 };              // FAULT_CODES - PID 0x3B: Read DTCs
 const unsigned char pid_0x14[] = { 0x14, 0x31, 0xDD, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };              // CLEAR_FAULTS
 const unsigned char pid_0x15[] = { 0x02, 0x21, 0x1D, 0x00 };              // FUELLING - PID 0x1D: Fuelling data
+const unsigned char pid_0x17[] = { 0x02, 0x21, 0x36, 0x00 };             // RELAY_OUTPUTS - PID 0x36: relay/output status bitfield
+const unsigned char pid_0x18[] = { 0x02, 0x21, 0x45, 0x00 };             // EGR_INLET - PID 0x45: EGR inlet throttle (%)
+const unsigned char pid_0x19[] = { 0x02, 0x1A, 0x87, 0x00 };             // VIN_READ - Service 0x1A id 0x87: VIN (flash ECUs only)
+const unsigned char pid_0x1A[] = { 0x02, 0x21, 0x32, 0x00 };             // MAP_NAME - PID 0x32: map/fuel/homologation strings
 
 const byte *td5_pids[] =
 {
   pid_0x00, pid_0x01, pid_0x02, pid_0x03, pid_0x04, pid_0x05, pid_0x06, pid_0x07,
   pid_0x08, pid_0x09, pid_0x0A, pid_0x0B, pid_0x0C, pid_0x0D, pid_0x0E, pid_0x0F,
-  pid_0x10, pid_0x11, pid_0x12, pid_0x13, pid_0x14, pid_0x15, pid_0x16
+  pid_0x10, pid_0x11, pid_0x12, pid_0x13, pid_0x14, pid_0x15, pid_0x16,
+  pid_0x17, pid_0x18, pid_0x19, pid_0x1A
 };
 
 Td5Pid pidInitFrame(INIT_FRAME, 5, 5);
@@ -117,6 +122,10 @@ Td5Pid pidEGR(EGR_MOD, 4, 6, 0);
 Td5Pid pidILT(ILT_MOD, 4, 6, 0);
 Td5Pid pidTWG(TWG_MOD, 4, 6, 0);
 Td5Pid pidFuelling(FUELLING, 4, 22);
+Td5Pid pidRelayOutputs(RELAY_OUTPUTS, 4, 8, 0);   // 0x36 relay/output bitfield
+Td5Pid pidEgrInlet(EGR_INLET, 4, 6, 0);           // 0x45 EGR inlet throttle
+Td5Pid pidVin(VIN_READ, 4, 64, 0);                // 1A 87 VIN (variable length)
+Td5Pid pidMapName(MAP_NAME, 4, 40, 0);            // 21 32 map/fuel/homologation (28 bytes)
 
 ///////////////////////////////////////////////////
 //              Generic functions                //

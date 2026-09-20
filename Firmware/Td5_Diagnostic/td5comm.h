@@ -58,7 +58,12 @@ Td5Comm.h -
 #define CLEAR_FAULTS    0x14
 #define FUELLING        0x15
 #define CRUISE_SWITCHES 0x16   // PID 0x1E - Cruise/Brake switches (Nanocom-validated)
-#define DIGITAL_INPUTS  0x0E   // Alias: RPM_ERROR is actually Digital Inputs (0x21)
+#define DIGITAL_INPUTS  0x0E   // Alias: RPM_ERROR is actually Idle Speed Error (0x21)
+#define IDLE_ERROR      0x0E   // Alias: PID 0x21 = Idle Speed Error (signed RPM)
+#define RELAY_OUTPUTS   0x17   // PID 0x36 - relay/output status bitfield
+#define EGR_INLET       0x18   // PID 0x45 - EGR inlet throttle (%)
+#define VIN_READ        0x19   // Service 0x1A id 0x87 - VIN (flash ECUs only)
+#define MAP_NAME        0x1A   // PID 0x32 - map/fuel/homologation strings
 
 class Td5Pid;
 
@@ -160,6 +165,10 @@ extern Td5Pid pidEGR;
 extern Td5Pid pidILT;
 extern Td5Pid pidTWG;
 extern Td5Pid pidFuelling;
+extern Td5Pid pidRelayOutputs;   // 0x36 - relay/output status bitfield
+extern Td5Pid pidEgrInlet;       // 0x45 - EGR inlet throttle
+extern Td5Pid pidVin;            // 1A 87 - VIN
+extern Td5Pid pidMapName;        // 21 32 - map/fuel/homologation
 
 #define PID_NOT_READY        0
 #define PID_LOST_FRAME      -1

@@ -21,9 +21,14 @@ static inline uint16_t be(Td5Pid& p, uint8_t i) {
 static inline uint16_t le(Td5Pid& p, uint8_t i) {   // little-endian (PID 0x23 only)
   return ((uint16_t)p.getResponseByte(i + 1) << 8) | p.getResponseByte(i);
 }
+static inline uint8_t bcd8(uint8_t b) { return (uint8_t)((b >> 4) * 10 + (b & 0x0F)); }
+
+// MAF raw -> g/s. MEMSTools reports kg/h; the raw appears to be kg/h x100, so
+// g/s = raw / 100 / 3.6 = raw / 360. VERIFY/calibrate on a running engine.
+#define TD5_MAF_RAW_TO_GS (1.0f / 360.0f)
 
 // Number of PIDs in the round-robin.
-#define TD5_POLL_COUNT 12
+#define TD5_POLL_COUNT 15
 
 bool Td5Provider::begin() {
   _d = VehicleData{};
@@ -31,6 +36,7 @@ bool Td5Provider::begin() {
   _d.ambientKpa   = 101.0f;   // benign defaults until the ECU is polled
   _d.coolantC     = 20.0f;
   _d.batteryMv    = 12600;
+  _fuelEco.begin();           // load the persisted 10-mile economy window from NVS
   _td5.init();
   _lastAttempt = 0;
   // Run all K-line I/O in a dedicated task pinned to core 0, so the blocking
@@ -74,6 +80,7 @@ void Td5Provider::pollStep() {
         _pollIdx        = 0;
         _lastDtcPoll    = 0;      // read fault codes into the buffer soon
         _clearPending   = false;
+        readEcuIdentity();        // one-shot VIN + map/fuel/homologation (static)
 #if DEBUG_SERIAL
         Serial.println("[TD5] ECU connected");
 #endif
@@ -112,6 +119,13 @@ void Td5Provider::pollStep() {
   _d.runtimeSec   = (millis() - _connectMs) / 1000UL;
   _d.ecuConnected = true;
 
+  // Fuel economy: integrate fuel (injection x rpm) vs distance (speed) each loop.
+  _fuelEco.update(_d.speedKmh, _d.rpm, _d.injectionMg, now);
+  _d.instMpg   = _fuelEco.instMpg();
+  _d.avgMpg    = _fuelEco.avgMpg();
+  _d.avgL100   = _fuelEco.avgL100();
+  _d.tripFuelL = _fuelEco.tripFuelL();
+
 #if TD5_DEBUG_FRAMES
   // Periodic dump of the DECODED buffer, so a serial capture shows both the raw
   // frames (from pollNext/refreshDtcBuffer) and the values they produced.
@@ -145,16 +159,19 @@ void Td5Provider::pollNext() {
   switch (_pollIdx) {
     case 0:  pid = &pidRPM;              minLen = 5;  break;  // 0x09 RPM        bytes 3-4
     case 1:  pid = &pidVehicleSpeed;     minLen = 4;  break;  // 0x0D speed      byte 3
-    case 2:  pid = &pidTemperatures;     minLen = 7;  break;  // 0x1A cool+MAP   bytes 3-6
+    case 2:  pid = &pidTemperatures;     minLen = 19; break;  // 0x1A temps+sensorV bytes 3-18
     case 3:  pid = &pidThrottlePosition;    minLen = 9;  break;  // 0x1B accel tracks 1/2/3 + 5V supply
-    case 4:  pid = &pidTurboPressureMaf; minLen = 9;  break;  // 0x1C iat(4)+fuel bytes 7-8
-    case 5:  pid = &pidBatteryVoltage;   minLen = 5;  break;  // 0x10 battery    bytes 3-4
-    case 6:  pid = &pidCruiseBrakeSwitches; minLen = 5;  break;  // 0x1E brake/handbrake/cruise switches
+    case 4:  pid = &pidTurboPressureMaf; minLen = 11; break;  // 0x1C MAP+MAF   bytes 3-10
+    case 5:  pid = &pidBatteryVoltage;   minLen = 7;  break;  // 0x10 battery + direct bytes 3-6
+    case 6:  pid = &pidCruiseBrakeSwitches; minLen = 5;  break;  // 0x1E brake/clutch/cruise/ignition switches
     case 7:  pid = &pidEGR;              minLen = 5;  break;  // 0x37 EGR        bytes 3-4
     case 8:  pid = &pidILT;              minLen = 5;  break;  // 0x38 wastegate  bytes 3-4
     case 9:  pid = &pidFuelling;         minLen = 19; break;  // 0x1D fuelling   bytes 3-18
-    case 10: pid = &pidAmbientPressure;     minLen = 5;  break;  // 0x23 ambient pressure (BE)
-    case 11: pid = &pidInjectorsBalance; minLen = 13; break;  // 0x40 injector trims bytes 3-12
+    case 10: pid = &pidAmbientPressure;     minLen = 7;  break;  // 0x23 ambient + direct bytes 3-6
+    case 11: pid = &pidInjectorsBalance; minLen = 13; break;  // 0x40 roughness bytes 3-12
+    case 12: pid = &pidRelayOutputs;     minLen = 5;  break;  // 0x36 relay/output bits 3-4
+    case 13: pid = &pidEgrInlet;         minLen = 5;  break;  // 0x45 EGR inlet throttle 3-4
+    case 14: pid = &pidDigitalInputs;    minLen = 5;  break;  // 0x21 idle speed error (signed) 3-4
     default: _pollIdx = 0; return;
   }
 
@@ -182,10 +199,13 @@ void Td5Provider::pollNext() {
     switch (_pollIdx) {
       case 0:  _d.rpm = be(pidRPM, 3); break;
       case 1:  _d.speedKmh = pidVehicleSpeed.getResponseByte(3); break;
-      case 2:
-        _d.coolantC = ((int16_t)be(pidTemperatures, 3) - 2732) / 10.0f;
-        _d.mapKpa   = be(pidTemperatures, 5) / 100.0f;                 // VERIFY scaling
-        _d.boostBar = (_d.mapKpa - _d.ambientKpa) / 100.0f;
+      case 2:  // PID 0x1A = TEMPERATURE composite (all Kelvin x10) + sensor voltages
+        _d.coolantC         = ((int16_t)be(pidTemperatures, 3)  - 2732) / 10.0f;  // off0
+        _d.coolantSensorV   =  be(pidTemperatures, 5)  / 1000.0f;                 // off2
+        _d.intakeAirC       = ((int16_t)be(pidTemperatures, 7)  - 2732) / 10.0f;  // off4
+        _d.intakeAirSensorV =  be(pidTemperatures, 9)  / 1000.0f;                 // off6
+        _d.fuelTempC        = ((int16_t)be(pidTemperatures, 15) - 2732) / 10.0f;  // off0C
+        _d.fuelTempSensorV  =  be(pidTemperatures, 17) / 1000.0f;                 // off0E
         break;
       case 3:  // PID 0x1B = accelerator tracks (BE, /1000 V); track1+track2 ~= supply
         _d.accelTrack1V = be(pidThrottlePosition, 3) / 1000.0f;
@@ -193,12 +213,17 @@ void Td5Provider::pollNext() {
         _d.accelTrack3V = be(pidThrottlePosition, 7) / 1000.0f;
         if (r >= 13) _d.refVoltageMv = be(pidThrottlePosition, 11);    // 5V sensor supply (bytes 11-12)
         break;
-      case 4:
-        // Matches the original app: inlet air = byte 4 / 10; fuel temp = (bytes 7-8) - 20.
-        _d.intakeAirC = pidTurboPressureMaf.getResponseByte(4) / 10.0f;        // VERIFY
-        _d.fuelTempC  = (float)((int16_t)be(pidTurboPressureMaf, 7) - 20);     // VERIFY
+      case 4:  // PID 0x1C = PRESSURE / AIRFLOW composite (was mislabelled temps)
+        _d.mapKpa       = be(pidTurboPressureMaf, 3) / 100.0f;                 // off0 MAP
+        _d.mapDirectKpa = be(pidTurboPressureMaf, 5) / 100.0f;                 // off2 MAP direct
+        _d.mafGs        = be(pidTurboPressureMaf, 7) * TD5_MAF_RAW_TO_GS;      // off4 MAF (VERIFY scale)
+        _d.mafSensorV   = be(pidTurboPressureMaf, 9) / 1000.0f;               // off6 MAF sensor V
+        _d.boostBar     = (_d.mapKpa - _d.ambientKpa) / 100.0f;
         break;
-      case 5:  _d.batteryMv = be(pidBatteryVoltage, 3); break;   // 0x10 battery (5V supply now from 0x1B)
+      case 5:  // 0x10 battery voltage + direct reading (5V supply now from 0x1B)
+        _d.batteryMv       = be(pidBatteryVoltage, 3);   // off0
+        _d.batteryDirectMv = be(pidBatteryVoltage, 5);   // off2
+        break;
       case 6: {  // PID 0x1E switches - EA2EGA-validated bit map. DB1=byte3, DB2=byte4.
         uint8_t b1 = pidCruiseBrakeSwitches.getResponseByte(3);  // DB1
         uint8_t b2 = pidCruiseBrakeSwitches.getResponseByte(4);  // DB2
@@ -207,8 +232,11 @@ void Td5Provider::pollNext() {
         _d.cruiseMaster  = (b1 & 0x04) != 0;   // DB1 bit2 cruise master
         _d.cruiseSet     = (b1 & 0x08) != 0;   // DB1 bit3 cruise set/accel
         _d.cruiseResume  = (b1 & 0x10) != 0;   // DB1 bit4 cruise resume
-        _d.acRequest     = (b2 & 0x08) != 0;   // DB2 bit3 A/C clutch request
-        _d.transferHigh  = (b2 & 0x40) == 0;   // DB2 bit6 set = low ratio -> High when clear
+        _d.acRequest       = (b2 & 0x08) != 0;   // DB2 bit3 A/C switch (panel input)
+        _d.transferHigh    = (b2 & 0x40) == 0;   // DB2 bit6 set = low ratio -> High when clear
+        _d.ignitionOn      = (b2 & 0x02) != 0;   // DB2 bit1 ignition switch
+        _d.securityLinkHigh= (b2 & 0x20) != 0;   // DB2 bit5 security link
+        _d.gearboxNeutral  = (b2 & 0x08) != 0;   // DB2 bit3 auto-box neutral (shares A/C-switch input; VERIFY on OEM auto)
         break;
       }
       case 7:  _d.egrPct       = be(pidEGR, 3) / 100.0f; break;        // VERIFY
@@ -216,20 +244,39 @@ void Td5Provider::pollNext() {
       case 9: {
         int16_t dd = (int16_t)be(pidFuelling, 3);          // driver demand is SIGNED
         _d.throttlePct   = (dd < 0) ? 0.0f : dd / 100.0f;  // small -ve zero-offset -> 0
-        _d.injectionMg   = be(pidFuelling, 9)  / 100.0f;   // injection quantity
-        _d.torqueLimitMg = be(pidFuelling, 13) / 100.0f;
-        _d.smokeLimitMg  = be(pidFuelling, 15) / 100.0f;
-        _d.idleDemandMg  = be(pidFuelling, 17) / 100.0f;
+        _d.injectionMg   = be(pidFuelling, 9)  / 100.0f;   // off6 injected quantity
+        _d.smokeLimitMg  = be(pidFuelling, 13) / 100.0f;   // off0A smoke map limit
+        _d.torqueLimitMg = be(pidFuelling, 15) / 100.0f;   // off0C torque map limit
+        _d.idleDemandMg  = be(pidFuelling, 17) / 100.0f;   // off0E idle demand
         _d.loadPct       = _d.throttlePct;                 // proxy for engine load
         break;
       }
-      case 10:  // PID 0x23 = ambient/barometric pressure (BE, /100 kPa)
-        _d.ambientKpa = be(pidAmbientPressure, 3) / 100.0f;
-        _d.boostBar   = (_d.mapKpa - _d.ambientKpa) / 100.0f;
+      case 10:  // PID 0x23 = ambient/barometric pressure + direct reading (BE, /100 kPa)
+        _d.ambientKpa       = be(pidAmbientPressure, 3) / 100.0f;   // off0
+        _d.ambientDirectKpa = be(pidAmbientPressure, 5) / 100.0f;   // off2
+        _d.boostBar         = (_d.mapKpa - _d.ambientKpa) / 100.0f;
         break;
-      case 11:  // PID 0x40 = per-cylinder fuelling trim (5 x signed int16, BE)
+      case 11:  // PID 0x40 = per-cylinder roughness (5 x signed int16, BE, RPM)
         for (uint8_t c = 0; c < 5; c++)
           _d.injTrim[c] = (int16_t)be(pidInjectorsBalance, 3 + c * 2);
+        break;
+      case 12: {  // PID 0x36 = relay / output status bitfield
+        uint8_t r0 = pidRelayOutputs.getResponseByte(3);   // off0
+        uint8_t r1 = pidRelayOutputs.getResponseByte(4);   // off1
+        _d.radFanDrive   = (r0 & 0x02) != 0;  // off0 bit1
+        _d.mainRelay     = (r1 & 0x01) != 0;  // off1 bit0
+        _d.fuelPumpRelay = (r1 & 0x04) != 0;  // off1 bit2
+        _d.acClutchDrive = (r1 & 0x08) != 0;  // off1 bit3
+        _d.milOn         = (r1 & 0x10) != 0;  // off1 bit4
+        _d.glowPlugLight = (r1 & 0x20) != 0;  // off1 bit5
+        _d.glowPlugRelay = (r1 & 0x40) != 0;  // off1 bit6
+        break;
+      }
+      case 13:  // PID 0x45 = EGR inlet throttle
+        _d.egrInletPct = be(pidEgrInlet, 3) / 100.0f;
+        break;
+      case 14:  // PID 0x21 = idle speed error (signed RPM)
+        _d.idleSpeedErrorRpm = (int16_t)be(pidDigitalInputs, 3);
         break;
     }
     _lastGood = millis();
@@ -237,6 +284,61 @@ void Td5Provider::pollNext() {
 
   // A frame was transmitted (success, lost, or negative) -> advance the rotation.
   _pollIdx = (_pollIdx + 1) % TD5_POLL_COUNT;
+}
+
+// One-shot ECU identity read after a fresh connect. VIN needs a flash ECU
+// (service 1A 87); map/fuel/homologation come from service 21 32. Both are
+// static, so we read once and cache. Retries clear the 55 ms inter-request
+// gate; failures (e.g. MSB ECU with no VIN) simply leave the strings empty.
+void Td5Provider::readEcuIdentity() {
+  _d.vin[0] = _d.mapName[0] = _d.fuelVariant[0] = _d.homologation[0] = '\0';
+
+  // VIN: 02 1A 87 -> [len] 5A 87 <11 ASCII><3 BCD>...
+  for (uint8_t attempt = 0; attempt < 25; attempt++) {
+    int8_t r = _td5.getPid(&pidVin);
+    if (r == PID_NOT_READY) { delay(10); continue; }
+    if (r >= 17 && pidVin.getResponseByte(1) != 0x7F) {
+      for (uint8_t i = 0; i < 11; i++) _d.vin[i] = (char)pidVin.getResponseByte(3 + i);
+      snprintf(_d.vin + 11, 7, "%02u%02u%02u",
+               bcd8(pidVin.getResponseByte(14)),
+               bcd8(pidVin.getResponseByte(15)),
+               bcd8(pidVin.getResponseByte(16)));
+      _d.vin[17] = '\0';
+    }
+    break;   // transmitted (or negative) -> stop retrying
+  }
+
+  // Map / fuel / homologation: 02 21 32 -> [len] 61 32 <8 map><8 fuel><4 homolog>...
+  for (uint8_t attempt = 0; attempt < 25; attempt++) {
+    int8_t r = _td5.getPid(&pidMapName);
+    if (r == PID_NOT_READY) { delay(10); continue; }
+    if (r >= 23 && pidMapName.getResponseByte(1) != 0x7F
+                && pidMapName.getResponseByte(2) == 0x32) {
+      for (uint8_t i = 0; i < 8; i++) _d.mapName[i]      = (char)pidMapName.getResponseByte(3 + i);
+      for (uint8_t i = 0; i < 8; i++) _d.fuelVariant[i]  = (char)pidMapName.getResponseByte(11 + i);
+      for (uint8_t i = 0; i < 4; i++) _d.homologation[i] = (char)pidMapName.getResponseByte(19 + i);
+      _d.mapName[8] = _d.fuelVariant[8] = '\0';
+      _d.homologation[4] = '\0';
+    }
+    break;
+  }
+
+  // Accelerator pedal type from feature flags (PID 0x20 offset0 bit7): 3-way vs 2-way.
+  // Reuses pidStartFuelling, whose request is 02 21 20 (0x20 = feature flags, NOT injection).
+  for (uint8_t attempt = 0; attempt < 25; attempt++) {
+    int8_t r = _td5.getPid(&pidStartFuelling);
+    if (r == PID_NOT_READY) { delay(10); continue; }
+    if (r >= 4 && pidStartFuelling.getResponseByte(1) == 0x61
+               && pidStartFuelling.getResponseByte(2) == 0x20) {
+      _d.pedalTracks = (pidStartFuelling.getResponseByte(3) & 0x80) ? 3 : 2;   // off0 bit7
+    }
+    break;
+  }
+
+#if DEBUG_SERIAL
+  Serial.printf("[TD5] VIN='%s' map='%s' fuel='%s' homolog='%s' pedal=%u-track\n",
+                _d.vin, _d.mapName, _d.fuelVariant, _d.homologation, _d.pedalTracks);
+#endif
 }
 
 // --- DTCs ------------------------------------------------------------------

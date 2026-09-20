@@ -38,10 +38,17 @@ Apple's Safari does not support Web Bluetooth, so it will not connect there.  In
 
 There are four simple tabs - swipe left and right to move between them:
 
-- **Fault Codes** - read and clear DTC's, each with a plain-English description of the Td5 fault and a link to look it up online.
-- **Available Data** - every parameter the ECU will give you, including the extras that are unique to the Td5.  Tick what you'd like to see and/or graph, and pick your units.
+- **Fault Codes** - read and clear DTC's, each with a plain-English description of the Td5 fault and a link to look it up online.  Once connected it also shows the vehicle's VIN and current fuel-map name (where the ECU provides them).
+- **Available Data** - every parameter the ECU will give you, including the extras that are unique to the Td5 - injector balance, accelerator tracks, EGR and wastegate, glow-plug and relay states, sensor voltages, idle-speed error and more - plus calculated values like turbo boost and live fuel economy (instantaneous, a rolling 10-mile average, and trip fuel used).  Tick what you'd like to see and/or graph, and pick your units.
 - **Live Data** - your chosen parameters, updating live.
 - **Graphs** - up to four auto-scaling charts so you can watch how things move (boost, temperatures, injector balance and so on).
+
+### Logging
+
+On the **Available Data** tab there's a single **Log displayed items to CSV** tick box.  Tick it and everything you've chosen to display is written to a timestamped CSV file, in your selected units - handy for looking at a fault after a drive, or comparing readings over time.
+
+- **In the app**, the file is saved straight to the phone's **Documents** folder as `Td5_Log_<date>_<time>.csv` (open it with the Files app, or copy it off over USB).
+- **In the browser version**, tick to start, then use **Download log now** - or simply untick - to save the file to your browser's Downloads.
 
 ## Screenshots
 

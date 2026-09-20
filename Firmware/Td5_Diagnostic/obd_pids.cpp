@@ -37,6 +37,11 @@ static void appendU16(String& s, uint16_t v) {
   s += hx((uint8_t)(v & 0xFF));
 }
 
+// Append an ASCII string as space-separated hex bytes (up to maxLen or NUL).
+static void appendAscii(String& s, const char* p, uint8_t maxLen) {
+  for (uint8_t i = 0; i < maxLen && p[i]; i++) { s += ' '; s += hx((uint8_t)p[i]); }
+}
+
 // The mode-01 PIDs we implement. 0x00/0x20/0x40 are the range-continuation
 // indicators (they return the support bitmasks and also flag the next range).
 static const uint8_t SUPPORTED_01[] = {
@@ -258,11 +263,24 @@ String ObdTranslator::mode04() {
 }
 
 // ---------------------------------------------------------------------------
-// Mode 09 - vehicle information (minimal: we don't expose a VIN)
+// Mode 09 - vehicle information. VIN (PID 0x02) from the ECU's programming
+// history (flash/NNN ECUs only; empty otherwise -> NO DATA).
 // ---------------------------------------------------------------------------
 
-String ObdTranslator::mode09(uint8_t /*pid*/) {
-  return OBD_NO_DATA;
+String ObdTranslator::mode09(uint8_t pid) {
+  const VehicleData& d = _p.data();
+  switch (pid) {
+    case 0x00:                       // supported PIDs: only 0x02 (VIN)
+      return "49 00 40 00 00 00";
+    case 0x02: {                     // VIN
+      if (d.vin[0] == '\0') return OBD_NO_DATA;
+      String body = "49 02 01";      // 01 = one data item follows
+      appendAscii(body, d.vin, 17);
+      return body;
+    }
+    default:
+      return OBD_NO_DATA;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -345,12 +363,94 @@ String ObdTranslator::mode22(uint16_t did) {
       appendU16(body, clamp16((long)d.refVoltageMv));
       return body;
 
-    case 0xF013:  // Injector 1 fuelling trim (signed int16)
-    case 0xF014:  // Injector 2
-    case 0xF015:  // Injector 3
-    case 0xF016:  // Injector 4
-    case 0xF017:  // Injector 5
+    case 0xF013:  // Roughness cyl 1 (signed int16, RPM)
+    case 0xF014:  // Roughness cyl 2
+    case 0xF015:  // Roughness cyl 3
+    case 0xF016:  // Roughness cyl 4
+    case 0xF017:  // Roughness cyl 5
       appendU16(body, (uint16_t)d.injTrim[did - 0xF013]);
+      return body;
+
+    case 0xF018:  // Idle speed error, RPM (signed)  -> (int16)((A*256)+B)
+      appendU16(body, (uint16_t)d.idleSpeedErrorRpm);
+      return body;
+
+    case 0xF019:  // EGR inlet throttle, %           -> ((A*256)+B)/100
+      appendU16(body, clamp16(lroundf(d.egrInletPct * 100.0f)));
+      return body;
+
+    case 0xF01A: { // Status/relay bitfield (16 bits, see mask below)
+      uint16_t bits = 0;
+      if (d.mainRelay)        bits |= 0x0001;
+      if (d.fuelPumpRelay)    bits |= 0x0002;
+      if (d.glowPlugLight)    bits |= 0x0004;
+      if (d.glowPlugRelay)    bits |= 0x0008;
+      if (d.milOn)            bits |= 0x0010;
+      if (d.radFanDrive)      bits |= 0x0020;
+      if (d.acClutchDrive)    bits |= 0x0040;
+      if (d.ignitionOn)       bits |= 0x0080;
+      if (d.securityLinkHigh) bits |= 0x0100;
+      appendU16(body, bits);
+      return body;
+    }
+
+    case 0xF01B:  // Coolant temp sensor voltage, mV  -> ((A*256)+B)
+      appendU16(body, clamp16(lroundf(d.coolantSensorV * 1000.0f)));
+      return body;
+    case 0xF01C:  // Inlet air temp sensor voltage, mV
+      appendU16(body, clamp16(lroundf(d.intakeAirSensorV * 1000.0f)));
+      return body;
+    case 0xF01D:  // Fuel temp sensor voltage, mV
+      appendU16(body, clamp16(lroundf(d.fuelTempSensorV * 1000.0f)));
+      return body;
+    case 0xF01E:  // MAF sensor voltage, mV
+      appendU16(body, clamp16(lroundf(d.mafSensorV * 1000.0f)));
+      return body;
+    case 0xF01F:  // Manifold pressure direct reading -> ((A*256)+B)/100 kPa
+      appendU16(body, clamp16(lroundf(d.mapDirectKpa * 100.0f)));
+      return body;
+
+    case 0xF021:  // Map / calibration variant (8 ASCII)
+      if (d.mapName[0] == '\0') return OBD_NO_DATA;
+      appendAscii(body, d.mapName, 8);
+      return body;
+    case 0xF022:  // Fuel variant (8 ASCII)
+      if (d.fuelVariant[0] == '\0') return OBD_NO_DATA;
+      appendAscii(body, d.fuelVariant, 8);
+      return body;
+    case 0xF023:  // Homologation (4 ASCII)
+      if (d.homologation[0] == '\0') return OBD_NO_DATA;
+      appendAscii(body, d.homologation, 4);
+      return body;
+    case 0xF024:  // VIN (17 ASCII)
+      if (d.vin[0] == '\0') return OBD_NO_DATA;
+      appendAscii(body, d.vin, 17);
+      return body;
+
+    case 0xF025:  // Avg fuel economy, 10-mile, imperial mpg -> ((A*256)+B)/10
+      appendU16(body, clamp16(lroundf(d.avgMpg * 10.0f)));
+      return body;
+    case 0xF026:  // Instantaneous fuel economy, imperial mpg -> ((A*256)+B)/10
+      appendU16(body, clamp16(lroundf(d.instMpg * 10.0f)));
+      return body;
+    case 0xF027:  // Avg fuel economy, 10-mile, L/100km -> ((A*256)+B)/10
+      appendU16(body, clamp16(lroundf(d.avgL100 * 10.0f)));
+      return body;
+    case 0xF028:  // Trip fuel used (total injected), litres -> ((A*256)+B)/100
+      appendU16(body, clamp16(lroundf(d.tripFuelL * 100.0f)));
+      return body;
+
+    case 0xF029:  // Battery voltage direct reading, mV -> ((A*256)+B)
+      appendU16(body, d.batteryDirectMv);
+      return body;
+    case 0xF02A:  // Ambient pressure direct reading, kPa -> ((A*256)+B)/100
+      appendU16(body, clamp16(lroundf(d.ambientDirectKpa * 100.0f)));
+      return body;
+    case 0xF02B:  // Accelerator pedal type: number of tracks (2 or 3; 0 = unknown) -> A
+      body += ' '; body += hx(d.pedalTracks);
+      return body;
+    case 0xF02C:  // Gearbox drive neutral (auto box; shares A/C-switch bit, UNVERIFIED) -> A (1=neutral)
+      body += ' '; body += hx(d.gearboxNeutral ? 1 : 0);
       return body;
 
     default:
