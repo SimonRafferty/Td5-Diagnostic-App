@@ -161,6 +161,11 @@ String ObdTranslator::mode01Segment(uint8_t pid) {
   const VehicleData& d = _p.data();
   String body = hx(pid);
 
+  // ECU disconnected: report NO DATA for live values (empty segment) so the app
+  // freezes the last reading instead of showing stale zeros. Support masks
+  // (00/20/40) still answer so adapter discovery keeps working.
+  if (pid != 0x00 && pid != 0x20 && pid != 0x40 && !_p.connected()) return String("");
+
   switch (pid) {
     case 0x00:
     case 0x20:
@@ -292,6 +297,10 @@ String ObdTranslator::mode09(uint8_t pid) {
 String ObdTranslator::mode22(uint16_t did) {
   const VehicleData& d = _p.data();
   String body = "62 " + hx((uint8_t)(did >> 8)) + " " + hx((uint8_t)(did & 0xFF));
+
+  // Live DIDs report NO DATA when the ECU is disconnected (app freezes last value).
+  // The static identity strings (F021-F024, read once on connect) still answer.
+  if (!_p.connected() && !(did >= 0xF021 && did <= 0xF024)) return OBD_NO_DATA;
 
   switch (did) {
     case 0xF001:  // Injection quantity, mg  -> ((A*256)+B)/100

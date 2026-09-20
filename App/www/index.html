@@ -247,62 +247,72 @@ const RELAY_FLAGS = ['Main Relay','Fuel Pump','Glow Light','Glow Relay','MIL','R
    d = array of data bytes (the bytes after the "41 XX" / "62 F0 XX" prefix).
    range/bit locate a standard PID in the 0100/0120/0140 support bitmask.  */
 const PIDS = [
-  // key,     name,                 cmd,     prefix,  bytes, decode,                     unit,   dec, graph, range,bit
+  // Grouped to match values.md (no UI headers, just grouped order).
+  // key, name, cmd, prefix, bytes, decode, unit, dec, graph[, range,bit]
+  // --- Engine ---
   mk('rpm',   'Engine RPM',         '010C', '410C', 2, d=>(d[0]*256+d[1])/4,        U.rpm,  0, true,  0x00, 0x0C),
   mk('speed', 'Vehicle Speed',      '010D', '410D', 1, d=>d[0],                     U.kmh,  0, true,  0x00, 0x0D),
-  mk('coolant','Coolant Temp',      '0105', '4105', 1, d=>d[0]-40,                  U.degC, 0, true,  0x00, 0x05),
-  mk('iat',   'Intake Air Temp',    '010F', '410F', 1, d=>d[0]-40,                  U.degC, 0, true,  0x00, 0x0F),
-  mk('map',   'Intake MAP',         '010B', '410B', 1, d=>d[0],                     U.kpa,  0, true,  0x00, 0x0B),
-  mk('baro',  'Barometric Pressure','0133', '4133', 1, d=>d[0],                     U.kpa,  0, true,  0x20, 0x33),
-  mk('maf',   'Mass Air Flow',      '0110', '4110', 2, d=>(d[0]*256+d[1])/100,      U.gps,  1, true,  0x00, 0x10),
-  mk('thr',   'Throttle / Demand',  '0111', '4111', 1, d=>d[0]*100/255,            U.pct,  1, true,  0x00, 0x11),
   mk('load',  'Engine Load',        '0104', '4104', 1, d=>d[0]*100/255,            U.pct,  1, true,  0x00, 0x04),
+  mkc('idle', 'Idle Speed Error', '22F018','62F018',2,d=>((d[0]<<8|d[1])<<16>>16),U.rpm,0,true),
   mk('run',   'Run Time',           '011F', '411F', 2, d=>d[0]*256+d[1],            U.sec,  0, true,  0x00, 0x1F),
-  mk('volt',  'Module Voltage',     '0142', '4142', 2, d=>(d[0]*256+d[1])/1000,     U.volt, 1, true,  0x40, 0x42),
-  // Td5 custom (mode 22, DIDs F001..F00D)
+  // --- Fuelling ---
+  mkc('dem',  'Driver Demand',  '22F00C','62F00C', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
+  mk('thr',   'Throttle / Demand',  '0111', '4111', 1, d=>d[0]*100/255,            U.pct,  1, true,  0x00, 0x11),
   mkc('inj',  'Injection Qty',  '22F001','62F001', 2, d=>(d[0]*256+d[1])/100,   U.mg,   1, true),
-  mkc('boost','Boost',          '22F002','62F002', 2, d=>((d[0]*256+d[1])/1000)-1, U.bar,2, true),
-  mkc('fuelt','Fuel Temp',      '22F003','62F003', 1, d=>d[0]-40,               U.degC, 0, true),
-  mkc('tmaf', 'MAF Air Mass',   '22F004','62F004', 2, d=>(d[0]*256+d[1])/100,   U.gps,  1, true),
   mkc('trq',  'Torque Limit',   '22F005','62F005', 2, d=>(d[0]*256+d[1])/100,   U.mg,   1, true),
   mkc('smk',  'Smoke Limit',    '22F006','62F006', 2, d=>(d[0]*256+d[1])/100,   U.mg,   1, true),
-  mkc('egr',  'EGR Position',   '22F007','62F007', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
-  mkc('wg',   'Wastegate Pos',  '22F008','62F008', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
-  mkc('gear', 'Selected Gear',  '22F009','62F009', 1, d=>d[0],                  U.gear, 0, true),
+  // --- Fuel economy ---
+  mkc('impg', 'Instant MPG',       '22F026','62F026',2,d=>(d[0]*256+d[1])/10, U.mpg,  1, true),
+  mkc('ampg', 'Avg MPG (10 mi)',   '22F025','62F025',2,d=>(d[0]*256+d[1])/10, U.mpg,  1, true),
+  mkc('al100','Avg L/100km (10 mi)','22F027','62F027',2,d=>(d[0]*256+d[1])/10,U.l100, 1, true),
+  mkc('trip', 'Trip Fuel Used',    '22F028','62F028',2,d=>(d[0]*256+d[1])/100,U.litre,2, true),
+  // --- Air & pressure ---
+  mk('map',   'Intake MAP',         '010B', '410B', 1, d=>d[0],                     U.kpa,  0, true,  0x00, 0x0B),
+  mkc('mapd', 'MAP Direct',       '22F01F','62F01F',2,d=>(d[0]*256+d[1])/100, U.kpa, 0, true),
+  mk('baro',  'Barometric Pressure','0133', '4133', 1, d=>d[0],                     U.kpa,  0, true,  0x20, 0x33),
+  mkc('apd',  'Ambient Direct',    '22F02A','62F02A',2,d=>(d[0]*256+d[1])/100, U.kpa, 1, true),
+  mkc('boost','Boost',          '22F002','62F002', 2, d=>((d[0]*256+d[1])/1000)-1, U.bar,2, true),
+  mk('maf',   'Mass Air Flow',      '0110', '4110', 2, d=>(d[0]*256+d[1])/100,      U.gps,  1, true,  0x00, 0x10),
+  mkc('tmaf', 'MAF Air Mass',   '22F004','62F004', 2, d=>(d[0]*256+d[1])/100,   U.gps,  1, true),
+  // --- Temperatures ---
+  mk('coolant','Coolant Temp',      '0105', '4105', 1, d=>d[0]-40,                  U.degC, 0, true,  0x00, 0x05),
+  mk('iat',   'Intake Air Temp',    '010F', '410F', 1, d=>d[0]-40,                  U.degC, 0, true,  0x00, 0x0F),
+  mkc('fuelt','Fuel Temp',      '22F003','62F003', 1, d=>d[0]-40,               U.degC, 0, true),
+  // --- Sensor voltages ---
+  mkc('csv',  'Coolant Sensor V', '22F01B','62F01B',2,d=>(d[0]*256+d[1])/1000,U.volt,2,false),
+  mkc('iatv', 'Inlet Air Sensor V','22F01C','62F01C',2,d=>(d[0]*256+d[1])/1000,U.volt,2,false),
+  mkc('ftv',  'Fuel Sensor V',    '22F01D','62F01D',2,d=>(d[0]*256+d[1])/1000,U.volt,2,false),
+  mkc('mafv', 'MAF Sensor V',     '22F01E','62F01E',2,d=>(d[0]*256+d[1])/1000,U.volt,2,false),
+  // --- Accelerator ---
   mkc('at1',  'Accel Track 1',  '22F00A','62F00A', 2, d=>(d[0]*256+d[1])/1000,  U.volt, 2, true),
   mkc('at2',  'Accel Track 2',  '22F00B','62F00B', 2, d=>(d[0]*256+d[1])/1000,  U.volt, 2, true),
-  mkc('dem',  'Driver Demand',  '22F00C','62F00C', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
   mkc('at3',  'Accel Track 3',  '22F00E','62F00E', 2, d=>(d[0]*256+d[1])/1000,  U.volt, 2, true),
   mkc('vref', 'Accel Supply (5V)','22F010','62F010', 2, d=>(d[0]*256+d[1])/1000,U.volt, 2, true),
-  mkc('stat', 'Input Switches', '22F00D','62F00D', 1, d=>d[0],                  U.bits, 0, false),
+  mkc('ptk',  'Pedal Tracks',      '22F02B','62F02B',1,d=>d[0],                U.gear,0, false),
+  // --- Actuators ---
+  mkc('egr',  'EGR Position',   '22F007','62F007', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
+  mkc('egri', 'EGR Inlet Throttle','22F019','62F019',2,d=>(d[0]*256+d[1])/100, U.pct, 1, true),
+  mkc('wg',   'Wastegate Pos',  '22F008','62F008', 2, d=>(d[0]*256+d[1])/10,    U.pct,  1, true),
+  // --- Injectors ---
   mkc('inj1', 'Injector 1 Fuelling','22F013','62F013',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
   mkc('inj2', 'Injector 2 Fuelling','22F014','62F014',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
   mkc('inj3', 'Injector 3 Fuelling','22F015','62F015',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
   mkc('inj4', 'Injector 4 Fuelling','22F016','62F016',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
   mkc('inj5', 'Injector 5 Fuelling','22F017','62F017',2,d=>((d[0]<<8|d[1])<<16>>16),U.trim,0,true),
-  // MEMSTools-derived additions (2026-09-20): new PIDs 0x45/0x21/0x1C/0x1A/0x36
-  mkc('egri', 'EGR Inlet Throttle','22F019','62F019',2,d=>(d[0]*256+d[1])/100, U.pct, 1, true),
-  mkc('idle', 'Idle Speed Error', '22F018','62F018',2,d=>((d[0]<<8|d[1])<<16>>16),U.rpm,0,true),
-  mkc('mapd', 'MAP Direct',       '22F01F','62F01F',2,d=>(d[0]*256+d[1])/100, U.kpa, 0, true),
-  mkc('csv',  'Coolant Sensor V', '22F01B','62F01B',2,d=>(d[0]*256+d[1])/1000,U.volt,2,false),
-  mkc('iatv', 'Inlet Air Sensor V','22F01C','62F01C',2,d=>(d[0]*256+d[1])/1000,U.volt,2,false),
-  mkc('ftv',  'Fuel Sensor V',    '22F01D','62F01D',2,d=>(d[0]*256+d[1])/1000,U.volt,2,false),
-  mkc('mafv', 'MAF Sensor V',     '22F01E','62F01E',2,d=>(d[0]*256+d[1])/1000,U.volt,2,false),
+  // --- Switches & inputs ---
+  mkc('stat', 'Input Switches', '22F00D','62F00D', 1, d=>d[0],                  U.bits, 0, false),
+  mkc('gbn',  'Gearbox Neutral',   '22F02C','62F02C',1,d=>d[0],                U.bits,0, false,['Neutral']),
+  // --- Relay / output drives ---
   mkc('outs', 'Output/Relay Status','22F01A','62F01A',2,d=>(d[0]*256+d[1]),   U.bits,0,false,RELAY_FLAGS),
-  // Fuel economy (derived; 10-mile rolling window persisted in the dongle's NVS)
-  mkc('ampg', 'Avg MPG (10 mi)',   '22F025','62F025',2,d=>(d[0]*256+d[1])/10, U.mpg,  1, true),
-  mkc('impg', 'Instant MPG',       '22F026','62F026',2,d=>(d[0]*256+d[1])/10, U.mpg,  1, true),
-  mkc('al100','Avg L/100km (10 mi)','22F027','62F027',2,d=>(d[0]*256+d[1])/10,U.l100, 1, true),
-  mkc('trip', 'Trip Fuel Used',    '22F028','62F028',2,d=>(d[0]*256+d[1])/100,U.litre,2, true),
-  // Completeness: direct-reading duplicates + pedal type + gearbox neutral
+  // --- Electrical ---
+  mk('volt',  'Module Voltage',     '0142', '4142', 2, d=>(d[0]*256+d[1])/1000,     U.volt, 1, true,  0x40, 0x42),
   mkc('bvd',  'Battery Direct',    '22F029','62F029',2,d=>(d[0]*256+d[1])/1000,U.volt,2, true),
-  mkc('apd',  'Ambient Direct',    '22F02A','62F02A',2,d=>(d[0]*256+d[1])/100, U.kpa, 1, true),
-  mkc('ptk',  'Pedal Tracks',      '22F02B','62F02B',1,d=>d[0],                U.gear,0, false),
-  mkc('gbn',  'Gearbox Neutral',   '22F02C','62F02C',1,d=>d[0],                U.bits,0, false,['Neutral'])
+  // --- Driveline ---
+  mkc('gear', 'Selected Gear',  '22F009','62F009', 1, d=>d[0],                  U.gear, 0, true)
 ];
 function mk(key,name,cmd,prefix,bytes,decode,unit,dec,graph,range,bit){
   return {key,name,cmd,prefix,bytes,decode,unit,dec,graph,std:true,range,bit,
-          avail:false, display:false, graphOn:false, unitSel:unit.uk||'metric',
+          avail:true, display:false, graphOn:false, unitSel:unit.uk||'metric',
           value:null, samples:[]};
 }
 function mkc(key,name,cmd,prefix,bytes,decode,unit,dec,graph,flags){
@@ -676,19 +686,10 @@ async function disconnect(){
 /* ---- ELM init + PID discovery --------------------------------------- */
 async function initAndDiscover(){
   for(const c of ['ATZ','ATE0','ATL0','ATS1','ATH0','ATSP6']){ await send(c); await sleep(40); }
-  // Standard-PID support bitmasks (0100/0120/0140).
-  const masks={};
-  for(const base of [0x00,0x20,0x40]){
-    const r=await send('01'+hex2(base));
-    masks[base]=parseSupportMask(r,base);
-  }
-  for(const p of PIDS){
-    if(p.std){
-      const m=masks[p.range];
-      p.avail = m ? bitSet(m, p.bit - p.range) : false;
-    }
-  }
-  loadConfig();          // restore ticks/units now that availability is known
+  // Every item is shown as available/selectable (nothing greyed out) - the Td5
+  // supports all the values we list, so we no longer probe the support bitmasks
+  // to grey out unavailable ones.
+  loadConfig();          // restore ticks/units
   renderAvail(); renderLive(); renderGraphs();
 }
 
@@ -809,7 +810,7 @@ async function startPolling(){
       const v=decodeResp(p,resp);
       if(v!==null){
         p.value=v;
-        const t=Date.now();
+        const t=Date.now(); lastSampleTs=t;   // mark data flowing (for graph freeze)
         p.samples.push({t,v});
         const cutoff=t-GRAPH_WINDOW_MS-2000;
         while(p.samples.length && p.samples[0].t<cutoff) p.samples.shift();
@@ -1047,6 +1048,9 @@ function updateLiveCell(p){
    Graphs tab  (pure-canvas, auto-scaling line charts)
    ===================================================================== */
 const MAX_GRAPHS=4, GRAPH_WINDOW_MS=60000;
+// Timestamp of the last fresh sample (any PID). When data stops, graphs freeze
+// their time window here instead of scrolling off into an empty chart.
+let lastSampleTs=0; const GRAPH_STALE_MS=3000;
 function countGraphed(){ return PIDS.filter(p=>p.graphOn && p.avail).length; }
 function renderGraphs(){
   const wrap=document.getElementById('graphWrap'); wrap.innerHTML='';
@@ -1072,7 +1076,10 @@ function drawChart(p){
   if(cv.width!==w*dpr||cv.height!==h*dpr){ cv.width=w*dpr; cv.height=h*dpr; }
   const g=cv.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,w,h);
   const padL=44,padR=8,padT=8,padB=18;
-  const now=Date.now(), t0=now-GRAPH_WINDOW_MS;
+  // Freeze the window when data has stopped, so the last readings stay visible
+  // instead of scrolling off into an empty chart.
+  const now=(lastSampleTs && (Date.now()-lastSampleTs)>GRAPH_STALE_MS) ? lastSampleTs : Date.now();
+  const t0=now-GRAPH_WINDOW_MS;
   const pts=p.samples.filter(s=>s.t>=t0).map(s=>({t:s.t, v:shownValue(p,s.v)}));
   // current value label
   const cvEl=document.getElementById('cv-'+p.key);
