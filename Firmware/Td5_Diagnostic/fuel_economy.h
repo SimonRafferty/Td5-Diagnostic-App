@@ -70,15 +70,19 @@ public:
     if (_instMph < 1.0f) return 0.0f;
     return (_instLps * 3600.0f) / (_instMph / KMH_TO_MPH) * 100.0f;
   }
+  // Rolling 10-mile average, "warmed up": starts at the instantaneous reading and
+  // converges to the true window average as the 10-mile window fills (w = 0..1).
   float avgMpg() const {
     float mi, l; window(mi, l);
-    if (l < 1e-4f || mi < 1e-3f) return 0.0f;
-    return mi * IMP_GAL_L / l;
+    float win = (l < 1e-4f || mi < 1e-3f) ? 0.0f : mi * IMP_GAL_L / l;
+    float w = mi / WINDOW_MI; if (w > 1.0f) w = 1.0f;
+    return instMpg() * (1.0f - w) + win * w;
   }
   float avgL100() const {
     float mi, l; window(mi, l);
-    if (mi < 1e-3f) return 0.0f;
-    return l / (mi / KMH_TO_MPH) * 100.0f;
+    float win = (mi < 1e-3f) ? 0.0f : l / (mi / KMH_TO_MPH) * 100.0f;
+    float w = mi / WINDOW_MI; if (w > 1.0f) w = 1.0f;
+    return instL100() * (1.0f - w) + win * w;
   }
   float tripFuelL() const { return _s.tripL; }
 
@@ -87,6 +91,7 @@ public:
 private:
   static const int      NB            = 20;         // 20 x 0.5 mi = 10-mile window
   static constexpr float BUCKET_MI     = 0.5f;
+  static constexpr float WINDOW_MI     = NB * BUCKET_MI;  // full window distance (miles)
   static constexpr float INJ_PER_REV   = 2.5f;      // 5-cyl 4-stroke
   static constexpr float DIESEL_G_PER_L= 832.0f;
   static constexpr float IMP_GAL_L     = 4.54609f;
