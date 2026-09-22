@@ -75,13 +75,13 @@ public:
   float avgMpg() const {
     float mi, l; window(mi, l);
     float win = (l < 1e-4f || mi < 1e-3f) ? 0.0f : mi * IMP_GAL_L / l;
-    float w = mi / WINDOW_MI; if (w > 1.0f) w = 1.0f;
+    float w = mi / WARMUP_MI; if (w > 1.0f) w = 1.0f;
     return instMpg() * (1.0f - w) + win * w;
   }
   float avgL100() const {
     float mi, l; window(mi, l);
     float win = (mi < 1e-3f) ? 0.0f : l / (mi / KMH_TO_MPH) * 100.0f;
-    float w = mi / WINDOW_MI; if (w > 1.0f) w = 1.0f;
+    float w = mi / WARMUP_MI; if (w > 1.0f) w = 1.0f;
     return instL100() * (1.0f - w) + win * w;
   }
   float tripFuelL() const { return _s.tripL; }
@@ -91,7 +91,7 @@ public:
 private:
   static const int      NB            = 20;         // 20 x 0.5 mi = 10-mile window
   static constexpr float BUCKET_MI     = 0.5f;
-  static constexpr float WINDOW_MI     = NB * BUCKET_MI;  // full window distance (miles)
+  static constexpr float WARMUP_MI     = 1.0f;           // blend inst->avg over the first mile only
   static constexpr float INJ_PER_REV   = 2.5f;      // 5-cyl 4-stroke
   static constexpr float DIESEL_G_PER_L= 832.0f;
   static constexpr float IMP_GAL_L     = 4.54609f;
