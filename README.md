@@ -99,7 +99,7 @@ The dongle is an ESP32-S3 plus a simple K-Line interface (an L9637D transceiver 
 
 ## Building From Source
 
-**Firmware:** open `Firmware/Td5_Diagnostic/Td5_Diagnostic.ino` in the Arduino IDE, select the **XIAO_ESP32S3** board and upload.  The only extra library you'll need is *EspSoftwareSerial*.
+**Firmware:** open `Firmware/Td5_Diagnostic/Td5_Diagnostic.ino` in the Arduino IDE, select the **XIAO_ESP32S3** board and upload.  You'll need the *EspSoftwareSerial* and *NimBLE-Arduino* libraries (WiFi and DNSServer are built into the ESP32 core).  The web app the dongle serves over WiFi is embedded as `webapp_html.h`, which is already in the repo - so it builds as-is.  If you edit `Td5-Diagnostic.html`, regenerate that header first with `python Firmware/tools/embed_webapp.py`, then rebuild.
 
 **App:** the app itself is an HTML file (`App/www/index.html`) plus a small Bluetooth bridge (`App/www/ble-shim.js`).  The bridge is only used by the **native APK** - an Android WebView has no Web Bluetooth, so the bridge hands BLE to the phone's Bluetooth stack via Capacitor.  To rebuild the APK, run `npm install` in the `App` folder, then `npx cap sync android` and build with Android Studio (or Gradle).
 
