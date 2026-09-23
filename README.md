@@ -5,11 +5,31 @@ An OBD2 Scanner has become an essential part of most vehicle owners toolkit.  Ho
 
 NanoCom from BlackBox Solutions is the go-to for most people - but it is rather expensive.  If you want to re-map your engine, it's good value - but I suspect many users just want to be able to read live data, read and clear Diagnostic Trouble Codes (DTC's).  For any other vehicle, a simple ELM327 scanner and a phone app will costs next to nothing - but Td5 owners have to fork out £600+ for NanoCom.  My intention with this project is to provide a lower cost option.  One that I can leave in the Land Rover without having to worry that it will get wet / damaged / stolen.
 
-Along with the linked hardware (A K-Line Interface + ESP32S3), this emulates an ELM327 scanner when plugged into a Td5 Engine.  Use an app such as 'EOBD-Facile', connected via bluetooth low energy (BLE).  Unfortunately, it is not compatible with Torque which only uses Bluetooth 3 & that's not available on an ESP32S3.
+Along with the linked hardware (a K-Line interface + ESP32-S3), it plugs into the Td5 diagnostic socket and emulates an ELM327 scanner.  Unlike the other OBD2 apps, the app here also shows all the information unique to Td5 vehicles, and reads and clears DTC fault codes - completely free and open source.
 
-Inside your scanner, you should see a Bluetooth device called "OBDII".  Connect to this.
+## Connecting to the Dongle
 
-Alternatively, install the APK in the repo - it's completely free & open source.  Unlike the other OBD2 apps, it will also display all the information unique to Td5 vehicles.  You can easily read and clear DTC fault codes too.
+There are two ways to talk to the dongle - **WiFi** (the easy route; works on everything, including iPhones) or **Bluetooth** (handy when you want to keep your phone's internet).
+
+### WiFi - recommended (Android, PC and iPhone/iPad)
+
+The dongle hosts the whole app itself, so **any device with a browser** can use it - nothing to install, no Bluetooth, and it works on iOS where browsers aren't allowed to use Bluetooth.
+
+1. Connect your phone, tablet or PC to the open WiFi network **`OBDII`** (no password).
+2. Open a browser and go to **http://10.0.0.1**.
+
+That's it.  (While you're on the dongle's WiFi your device has no internet, so online fault-code look-ups won't work - use Bluetooth below if you need those.)
+
+### Bluetooth (BLE) - when you want to keep your internet
+
+Connecting over Bluetooth leaves your phone on its normal WiFi/mobile data, so online DTC look-ups keep working.  Two ways:
+
+- **The Android app** - install the [APK](Td5-Diagnostics-debug.apk) (see *Installing the App* below), tap **Connect**, and choose **OBDII**.
+- **The web page over Bluetooth** - open [the app page](https://simonrafferty.github.io/Td5-Diagnostic-App/Td5-Diagnostic.html) in **Chrome or Edge** (Android/PC), or in the free **Bluefy** browser on **iPhone/iPad**, and tap **Connect**.
+
+Generic BLE OBD apps (e.g. EOBD-Facile) work too - look for a Bluetooth device called **OBDII**.  (Torque isn't supported: it needs classic Bluetooth, which the ESP32-S3 doesn't have.)
+
+> The dongle serves **one connection at a time** - whichever you connect with first (WiFi or Bluetooth) is used for that session, and the other is disabled until the dongle restarts (it restarts each time the engine starts).
 
 ## Installing the App
 
@@ -32,7 +52,7 @@ The whole app is packaged as a single, self-contained web page - [**Td5-Diagnost
 
 ### iPhone and iPad
 
-Apple's Safari does not support Web Bluetooth, so it will not connect there.  Install the free **Bluefy** browser from the App Store and open **https://simonrafferty.github.io/Td5-Diagnostic-App/Td5-Diagnostic.html**.  
+The easiest route on an iPhone or iPad is **WiFi** - join the **`OBDII`** network and open **http://10.0.0.1** (see *Connecting to the Dongle* above); Safari handles that fine.  Safari can't use Web *Bluetooth*, so if you'd rather connect over Bluetooth (to keep your internet), install the free **Bluefy** browser and open [the app page](https://simonrafferty.github.io/Td5-Diagnostic-App/Td5-Diagnostic.html).  
 
 ## What the App Does
 
@@ -62,7 +82,7 @@ On the **Available Data** tab there's a single **Log displayed items to CSV** ti
 
 | Folder | Contents |
 |--------|----------|
-| `Firmware/` | The ESP32-S3 dongle firmware (Arduino).  This is what turns the K-Line interface into a BLE ELM327 that the app - and other OBD2 apps - can talk to. |
+| `Firmware/` | The ESP32-S3 dongle firmware (Arduino).  It turns the K-Line interface into an ELM327 the app - and other OBD2 apps - can talk to over **Bluetooth**, and also hosts the app over **WiFi** (open `OBDII` network, http://10.0.0.1). |
 | `App/` | The Android app project (built with Capacitor) used to produce the APK. |
 | `Hardware/` | The complete dongle design: PCB gerbers, schematic, BOM, pick-and-place, Altium source, and 3D-printable case halves. |
 | [`Td5-Diagnostics-debug.apk`](Td5-Diagnostics-debug.apk) | The ready-to-install Android app. |

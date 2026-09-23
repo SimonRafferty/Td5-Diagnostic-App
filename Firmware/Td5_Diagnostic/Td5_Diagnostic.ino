@@ -33,15 +33,19 @@
   #include "driver/rtc_io.h"      // rtc_gpio_* (wake-pin pull config)
 #endif
 
+#include "transport_arbiter.h"
 #if ENABLE_WIFI_ELM
   #include "wifi_server.h"
+#endif
+#if ENABLE_WIFI_WEBAPP
+  #include "web_server.h"
 #endif
 #if ENABLE_BLE_ELM
   #include "ble_server.h"
 #endif
 
-#if !ENABLE_WIFI_ELM && !ENABLE_BLE_ELM
-  #error "Enable at least one transport (ENABLE_BLE_ELM or ENABLE_WIFI_ELM) in config.h"
+#if !ENABLE_WIFI_ELM && !ENABLE_WIFI_WEBAPP && !ENABLE_BLE_ELM
+  #error "Enable at least one transport (ENABLE_BLE_ELM / ENABLE_WIFI_WEBAPP / ENABLE_WIFI_ELM) in config.h"
 #endif
 
 #if DATA_SOURCE_SIM
@@ -55,11 +59,18 @@
 // The stack above the provider is identical in both phases and both transports.
 static ObdTranslator obd(provider);
 static Elm327        elm(obd);
+
+// One-radio-per-session lock shared by the BLE and WiFi servers (transport_arbiter.h).
+static TransportArbiter arbiter;
+
 #if ENABLE_WIFI_ELM
 static WifiElmServer wifiServer(elm, ELM_TCP_PORT);
 #endif
+#if ENABLE_WIFI_WEBAPP
+static WebAppServer  webServer(elm, arbiter, WEBAPP_HTTP_PORT);
+#endif
 #if ENABLE_BLE_ELM
-static BleElmServer  bleServer(elm);
+static BleElmServer  bleServer(elm, arbiter);
 #endif
 
 // ============================================================================
@@ -92,9 +103,9 @@ static uint16_t readBatteryVoltage() {
 //   D4 LOW  -> healthy: wake on the D4 rising edge (engine start) + a long backstop
 //   D4 HIGH -> can't trust it (stuck-high fault, or genuinely charging): poll in 10s
 static void enterSleepMode() {
-#if ENABLE_WIFI_ELM
+#if ENABLE_WIFI_ELM || ENABLE_WIFI_WEBAPP
   WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
+  WiFi.mode(WIFI_OFF);          // kill the AP radio before sleeping (covers the web-app AP too)
 #endif
   esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);   // clean slate - RTC config survives sleep
 
@@ -198,7 +209,10 @@ void setup() {
   Serial.println(F("Transport: BLE (advertising as \"" BLE_DEVICE_NAME "\")"));
 #endif
 #if ENABLE_WIFI_ELM
-  Serial.println(F("Transport: WiFi AP"));
+  Serial.println(F("Transport: WiFi AP (Torque TCP)"));
+#endif
+#if ENABLE_WIFI_WEBAPP
+  Serial.println(F("Transport: WiFi web app (SoftAP \"" AP_SSID "\" @ 10.0.0.1, open)"));
 #endif
 
 #if ENABLE_DEEP_SLEEP
@@ -215,6 +229,9 @@ void setup() {
 #if ENABLE_WIFI_ELM
   wifiServer.begin();
 #endif
+#if ENABLE_WIFI_WEBAPP
+  webServer.begin();    // SoftAP + captive portal + HTTP app host (shares the radio with BLE)
+#endif
 #if ENABLE_BLE_ELM
   bleServer.begin();
 #endif
@@ -223,11 +240,22 @@ void setup() {
 void loop() {
   provider.poll();      // refresh live values (non-blocking; K-line runs in its own task)
 #if ENABLE_WIFI_ELM
-  wifiServer.poll();    // service the WiFi ELM327 session
+  wifiServer.poll();    // service the WiFi ELM327 session (Torque)
 #endif
+
+  // One-radio-per-session: the first transport to get a real app connection wins;
+  // shut the other down (idempotent) and keep it down until the next wake/reboot.
+  // All radio teardown happens here in the main task - never in a NimBLE callback.
+  Transport a = arbiter.active();
 #if ENABLE_BLE_ELM
-  bleServer.poll();     // service the BLE ELM327 session
+  if (a == T_WIFI) bleServer.stop();     // WiFi won -> stop BLE
+  else             bleServer.poll();     // (no-op; replies are inline)
 #endif
+#if ENABLE_WIFI_WEBAPP
+  if (a == T_BLE)  webServer.shutdown(); // BLE won -> stop the WiFi AP
+  else             webServer.poll();     // serve DNS + HTTP
+#endif
+
 #if ENABLE_DEEP_SLEEP
   vbatDebug();          // periodic Serial battery print (diagnostic only)
   checkSleepCondition();// may enter deep sleep (does not return)

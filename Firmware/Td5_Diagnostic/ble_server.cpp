@@ -70,6 +70,13 @@ bool BleElmServer::begin() {
 
 void BleElmServer::onRxBytes(const uint8_t* data, size_t len) {
   if (!_connected) return;
+  // The first real command claims the session for BLE. A transient discovery
+  // connection never writes, so it won't lock out WiFi. If WiFi already won this
+  // session, drop this central (idempotent once BLE owns).
+  if (!_arb.claim(T_BLE)) {
+    if (_server && _curConn != 0xFFFF) _server->disconnect(_curConn);
+    return;
+  }
   for (size_t i = 0; i < len; i++) {
     char ch = (char)data[i];
     if (ch == '\r') {
@@ -125,9 +132,10 @@ void BleElmServer::onConnectEvt(uint16_t connHandle) {
 void BleElmServer::onDisconnectEvt(uint16_t connHandle) {
   _connected = false;
   _curConn   = 0xFFFF;
-  NimBLEDevice::startAdvertising();           // become connectable again
+  if (!_disableAutoReAdvertise) NimBLEDevice::startAdvertising();   // become connectable again
 #if DEBUG_SERIAL
-  Serial.printf("[BLE] central disconnected (handle %u); advertising\n", connHandle);
+  Serial.printf("[BLE] central disconnected (handle %u)%s\n",
+                connHandle, _disableAutoReAdvertise ? "" : "; advertising");
 #endif
 }
 
@@ -143,6 +151,19 @@ void BleElmServer::onMtu(uint16_t mtu) {
 void BleElmServer::poll() {
   // Nothing to do: replies are sent inline from onRxBytes(). Kept so the main
   // loop's call site is unchanged.
+}
+
+// Main-task context: called once WiFi has won the session. Stop advertising, drop
+// any attached central, and latch _disableAutoReAdvertise so onDisconnect doesn't
+// resurrect it. Idempotent - the main loop calls this every pass while WiFi owns.
+void BleElmServer::stop() {
+  if (_disableAutoReAdvertise) return;
+  _disableAutoReAdvertise = true;
+  NimBLEDevice::stopAdvertising();
+  if (_server && _curConn != 0xFFFF) _server->disconnect(_curConn);
+#if DEBUG_SERIAL
+  Serial.println("[BLE] stopped (WiFi won the session)");
+#endif
 }
 
 void BleElmServer::notifyChunked(const String& s) {

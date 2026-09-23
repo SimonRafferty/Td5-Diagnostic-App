@@ -32,13 +32,15 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include "elm327.h"
+#include "transport_arbiter.h"
 
 class BleElmServer {
 public:
-  explicit BleElmServer(Elm327& elm) : _elm(elm) {}
+  BleElmServer(Elm327& elm, TransportArbiter& arb) : _elm(elm), _arb(arb) {}
 
   bool begin();
   void poll();     // no-op: commands are answered synchronously in onRxBytes()
+  void stop();     // WiFi won the session: stop advertising + drop any central, and stay down
 
   // Called from NimBLE callback (host-task) context:
   void onRxBytes(const uint8_t* data, size_t len);   // assemble + answer inline
@@ -48,10 +50,12 @@ public:
 
 private:
   Elm327&               _elm;
+  TransportArbiter&     _arb;
   NimBLEServer*         _server = nullptr;
   NimBLECharacteristic* _notify = nullptr;
 
   volatile bool     _connected = false;
+  volatile bool     _disableAutoReAdvertise = false; // set when WiFi wins -> never re-advertise
   volatile uint16_t _mtu       = 23;     // ATT default until negotiated
   volatile uint16_t _curConn   = 0xFFFF; // active connection handle (0xFFFF = none)
 

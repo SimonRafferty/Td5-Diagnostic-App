@@ -26,7 +26,13 @@
 //   BLE  works with Car Scanner / OBD Fusion (BLE-native) and *maybe* Torque.
 //   WiFi is the guaranteed-Torque fallback (192.168.0.10:35000).
 #define ENABLE_BLE_ELM    1        // 1 = advertise as a BLE ELM327
-#define ENABLE_WIFI_ELM   0        // 1 = also run the WiFi AP + TCP server
+#define ENABLE_WIFI_ELM   0        // 1 = also run the WiFi AP + TCP server (Torque; legacy)
+
+// Browser-over-WiFi: the dongle hosts the web app and answers ELM over plain HTTP,
+// so iOS Safari (no Web Bluetooth) and any browser can use it. Shares the SoftAP.
+#define ENABLE_WIFI_WEBAPP    1    // 1 = SoftAP + HTTP server hosting the app + POST /elm bridge
+#define ENABLE_CAPTIVE_PORTAL 0    // removed - a JS app can't run in the OS captive mini-browsers
+#define WEBAPP_HTTP_PORT      80
 
 #define BLE_DEVICE_NAME   "OBDII"  // generic name every OBD app recognises
 
@@ -44,18 +50,18 @@
 // ---------------------------------------------------------------------------
 // Torque's WiFi OBD default is IP 192.168.0.10, port 35000. We match that so
 // the user only has to pick "Bluetooth/WiFi -> WiFi" in Torque with defaults.
-#define AP_SSID           "Td5-Diagnostic"
-#define AP_PASS           "landrover"    // >= 8 chars for WPA2; "" for an open AP
+#define AP_SSID           "OBDII"        // hotspot name (matches the BLE name + the join QR)
+#define AP_PASS           ""             // "" = OPEN network (no password); >= 8 chars for WPA2 otherwise
 #define AP_CHANNEL        6
 // Number of WiFi *associations* the AP allows. Must be >1 so a debug PC and the
 // phone can both be joined; the single-session nature of ELM327 is enforced at
 // the TCP layer (see WifiElmServer), NOT by limiting WiFi stations.
 #define AP_MAX_CLIENTS    4
 
-#define ELM_AP_IP_0       192
-#define ELM_AP_IP_1       168
+#define ELM_AP_IP_0       10
+#define ELM_AP_IP_1       0
 #define ELM_AP_IP_2       0
-#define ELM_AP_IP_3       10             // ESP32 will be 192.168.0.10
+#define ELM_AP_IP_3       1              // ESP32 will be 10.0.0.1 (clear of the user's 192.168.x / 172.22.x)
 #define ELM_TCP_PORT      35000
 
 // ---------------------------------------------------------------------------
