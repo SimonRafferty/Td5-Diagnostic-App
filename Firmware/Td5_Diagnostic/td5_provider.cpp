@@ -267,7 +267,7 @@ void Td5Provider::pollNext() {
         _d.mainRelay     = (r1 & 0x01) != 0;  // off1 bit0
         _d.fuelPumpRelay = (r1 & 0x04) != 0;  // off1 bit2
         _d.acClutchDrive = (r1 & 0x08) != 0;  // off1 bit3
-        _d.milOn         = (r1 & 0x10) == 0;  // off1 bit4 - MIL drive is ACTIVE-LOW (1 = lamp off)
+        _d.milOn         = (r1 & 0x10) != 0;  // off1 bit4 - MIL lamp drive, active-HIGH (bit=0 with dash lamp off, vehicle-observed)
         _d.glowPlugLight = (r1 & 0x20) != 0;  // off1 bit5
         _d.glowPlugRelay = (r1 & 0x40) != 0;  // off1 bit6
         break;

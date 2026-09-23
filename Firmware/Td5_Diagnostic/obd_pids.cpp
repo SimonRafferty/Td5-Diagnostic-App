@@ -178,7 +178,10 @@ String ObdTranslator::mode01Segment(uint8_t pid) {
       // round-trip on every 0101 poll.
       _p.readDTCs();
       uint8_t cnt = _p.data().dtcCount;
-      uint8_t a = (cnt ? 0x80 : 0x00) | (cnt & 0x7F);   // bit7 = MIL on
+      // bit7 = the ACTUAL dash MIL lamp state (0x36 bit4 via d.milOn), NOT "codes > 0".
+      // The Td5 stores historic/intermittent codes that do NOT light the dash lamp, so
+      // keying the MIL off the count left it permanently on. bits0-6 = stored-code count.
+      uint8_t a = (d.milOn ? 0x80 : 0x00) | (cnt & 0x7F);
       body += ' '; body += hx(a);
       body += " 00 00 00";
       return body;
