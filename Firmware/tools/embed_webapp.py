@@ -46,6 +46,14 @@ OUT = os.path.join(sketch, 'webapp_html.h')
 with open(SRC, 'rb') as f:
     data = f.read()
 
+# The dongle-served copy is HTTP-only: flip FORCE_HTTP so it never tries Bluetooth
+# (which would grab the session and shut the WiFi AP down) and auto-connects.
+MARK = b'let FORCE_HTTP=false;'
+if data.count(MARK) != 1:
+    raise SystemExit('embed_webapp: expected exactly one "%s" marker, found %d'
+                     % (MARK.decode(), data.count(MARK)))
+data = data.replace(MARK, b'let FORCE_HTTP=true;')
+
 # Fixed mtime=0 so the output is reproducible (diff-stable) across runs.
 buf = io.BytesIO()
 with gzip.GzipFile(fileobj=buf, mode='wb', compresslevel=9, mtime=0) as gz:
