@@ -118,6 +118,7 @@
 <header>
   <span class="title">Td5 Diagnostics</span>
   <span class="spacer"></span>
+  <span class="status"><span id="ecuDot" class="dot off"></span><span id="ecuText">Td5</span></span>
   <span class="status"><span id="dot" class="dot off"></span><span id="statusText">Disconnected</span></span>
   <button id="connectBtn">Connect</button>
 </header>
@@ -195,6 +196,8 @@
 
 <div id="toast"></div>
 
+<!-- Standalone browser build: talks straight to the Web Bluetooth API. The
+     native ble-shim.js bridge is only needed inside the Capacitor APK. -->
 <!-- Native BLE bridge: present only in the packaged app (Capacitor). In a plain
      browser this bundle loads a web-platform Capacitor whose isNativePlatform()
      is false, so the app transparently falls back to Web Bluetooth. -->
@@ -556,10 +559,20 @@ function dtcInfo(code){
    ===================================================================== */
 let device=null, writeChar=null, notifyChar=null, connected=false;
 let nativeDevId=null;                         // Capacitor BLE device id (native app)
+let isUsingHTTP=false;                         // connected over WiFi/HTTP (page served by the dongle)
+// FORCE_HTTP: the embed step (tools/embed_webapp.py) flips this to true in the copy the
+// dongle serves over WiFi, making that copy HTTP-only - it never tries Bluetooth (which
+// would grab the session and shut the WiFi AP down) and auto-connects with no button.
+let FORCE_HTTP=false;
+let connecting=false;                          // guards against overlapping connect() attempts
 let rxBuf='', pending=null, chain=Promise.resolve();
+const WIFI_QR_SVG='data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0nMS4wJyBlbmNvZGluZz0nVVRGLTgnPz4KPHN2ZyB3aWR0aD0iMjltbSIgaGVpZ2h0PSIyOW1tIiB2ZXJzaW9uPSIxLjEiIHZpZXdCb3g9IjAgMCAyOSAyOSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMiwySDNWM0gyek0zLDJINFYzSDN6TTQsMkg1VjNINHpNNSwySDZWM0g1ek02LDJIN1YzSDZ6TTcsMkg4VjNIN3pNOCwySDlWM0g4ek0xMSwySDEyVjNIMTF6TTE0LDJIMTVWM0gxNHpNMTYsMkgxN1YzSDE2ek0xOCwySDE5VjNIMTh6TTIwLDJIMjFWM0gyMHpNMjEsMkgyMlYzSDIxek0yMiwySDIzVjNIMjJ6TTIzLDJIMjRWM0gyM3pNMjQsMkgyNVYzSDI0ek0yNSwySDI2VjNIMjV6TTI2LDJIMjdWM0gyNnpNMiwzSDNWNEgyek04LDNIOVY0SDh6TTEzLDNIMTRWNEgxM3pNMTcsM0gxOFY0SDE3ek0xOCwzSDE5VjRIMTh6TTIwLDNIMjFWNEgyMHpNMjYsM0gyN1Y0SDI2ek0yLDRIM1Y1SDJ6TTQsNEg1VjVINHpNNSw0SDZWNUg1ek02LDRIN1Y1SDZ6TTgsNEg5VjVIOHpNMTAsNEgxMVY1SDEwek0xMSw0SDEyVjVIMTF6TTEyLDRIMTNWNUgxMnpNMTMsNEgxNFY1SDEzek0xNCw0SDE1VjVIMTR6TTE4LDRIMTlWNUgxOHpNMjAsNEgyMVY1SDIwek0yMiw0SDIzVjVIMjJ6TTIzLDRIMjRWNUgyM3pNMjQsNEgyNVY1SDI0ek0yNiw0SDI3VjVIMjZ6TTIsNUgzVjZIMnpNNCw1SDVWNkg0ek01LDVINlY2SDV6TTYsNUg3VjZINnpNOCw1SDlWNkg4ek0xMCw1SDExVjZIMTB6TTExLDVIMTJWNkgxMXpNMTMsNUgxNFY2SDEzek0xNCw1SDE1VjZIMTR6TTE1LDVIMTZWNkgxNXpNMTYsNUgxN1Y2SDE2ek0yMCw1SDIxVjZIMjB6TTIyLDVIMjNWNkgyMnpNMjMsNUgyNFY2SDIzek0yNCw1SDI1VjZIMjR6TTI2LDVIMjdWNkgyNnpNMiw2SDNWN0gyek00LDZINVY3SDR6TTUsNkg2VjdINXpNNiw2SDdWN0g2ek04LDZIOVY3SDh6TTEwLDZIMTFWN0gxMHpNMTgsNkgxOVY3SDE4ek0yMCw2SDIxVjdIMjB6TTIyLDZIMjNWN0gyMnpNMjMsNkgyNFY3SDIzek0yNCw2SDI1VjdIMjR6TTI2LDZIMjdWN0gyNnpNMiw3SDNWOEgyek04LDdIOVY4SDh6TTEwLDdIMTFWOEgxMHpNMTEsN0gxMlY4SDExek0xMiw3SDEzVjhIMTJ6TTEzLDdIMTRWOEgxM3pNMTcsN0gxOFY4SDE3ek0yMCw3SDIxVjhIMjB6TTI2LDdIMjdWOEgyNnpNMiw4SDNWOUgyek0zLDhINFY5SDN6TTQsOEg1VjlINHpNNSw4SDZWOUg1ek02LDhIN1Y5SDZ6TTcsOEg4VjlIN3pNOCw4SDlWOUg4ek0xMCw4SDExVjlIMTB6TTEyLDhIMTNWOUgxMnpNMTQsOEgxNVY5SDE0ek0xNiw4SDE3VjlIMTZ6TTE4LDhIMTlWOUgxOHpNMjAsOEgyMVY5SDIwek0yMSw4SDIyVjlIMjF6TTIyLDhIMjNWOUgyMnpNMjMsOEgyNFY5SDIzek0yNCw4SDI1VjlIMjR6TTI1LDhIMjZWOUgyNXpNMjYsOEgyN1Y5SDI2ek0xMCw5SDExVjEwSDEwek0xMSw5SDEyVjEwSDExek0xNCw5SDE1VjEwSDE0ek0xNiw5SDE3VjEwSDE2ek0xOCw5SDE5VjEwSDE4ek0yLDEwSDNWMTFIMnpNNCwxMEg1VjExSDR6TTUsMTBINlYxMUg1ek02LDEwSDdWMTFINnpNNywxMEg4VjExSDd6TTgsMTBIOVYxMUg4ek0xMSwxMEgxMlYxMUgxMXpNMTIsMTBIMTNWMTFIMTJ6TTE1LDEwSDE2VjExSDE1ek0xNiwxMEgxN1YxMUgxNnpNMjAsMTBIMjFWMTFIMjB6TTIxLDEwSDIyVjExSDIxek0yMiwxMEgyM1YxMUgyMnpNMjMsMTBIMjRWMTFIMjN6TTI0LDEwSDI1VjExSDI0ek0zLDExSDRWMTJIM3pNNCwxMUg1VjEySDR6TTYsMTFIN1YxMkg2ek05LDExSDEwVjEySDl6TTEwLDExSDExVjEySDEwek0xMiwxMUgxM1YxMkgxMnpNMTMsMTFIMTRWMTJIMTN6TTE0LDExSDE1VjEySDE0ek0xNiwxMUgxN1YxMkgxNnpNMTgsMTFIMTlWMTJIMTh6TTIwLDExSDIxVjEySDIwek0yMSwxMUgyMlYxMkgyMXpNMjYsMTFIMjdWMTJIMjZ6TTIsMTJIM1YxM0gyek0zLDEySDRWMTNIM3pNNCwxMkg1VjEzSDR6TTYsMTJIN1YxM0g2ek03LDEySDhWMTNIN3pNOCwxMkg5VjEzSDh6TTksMTJIMTBWMTNIOXpNMTAsMTJIMTFWMTNIMTB6TTE1LDEySDE2VjEzSDE1ek0xNywxMkgxOFYxM0gxN3pNMTksMTJIMjBWMTNIMTl6TTIwLDEySDIxVjEzSDIwek0yMiwxMkgyM1YxM0gyMnpNMjMsMTJIMjRWMTNIMjN6TTI0LDEySDI1VjEzSDI0ek0yNSwxMkgyNlYxM0gyNXpNMjYsMTJIMjdWMTNIMjZ6TTIsMTNIM1YxNEgyek0zLDEzSDRWMTRIM3pNNSwxM0g2VjE0SDV6TTYsMTNIN1YxNEg2ek03LDEzSDhWMTRIN3pNMTEsMTNIMTJWMTRIMTF6TTEzLDEzSDE0VjE0SDEzek0xNiwxM0gxN1YxNEgxNnpNMjAsMTNIMjFWMTRIMjB6TTI1LDEzSDI2VjE0SDI1ek0yNiwxM0gyN1YxNEgyNnpNMiwxNEgzVjE1SDJ6TTMsMTRINFYxNUgzek00LDE0SDVWMTVINHpNNSwxNEg2VjE1SDV6TTcsMTRIOFYxNUg3ek04LDE0SDlWMTVIOHpNMTIsMTRIMTNWMTVIMTJ6TTEzLDE0SDE0VjE1SDEzek0xNCwxNEgxNVYxNUgxNHpNMTUsMTRIMTZWMTVIMTV6TTE2LDE0SDE3VjE1SDE2ek0xOCwxNEgxOVYxNUgxOHpNMTksMTRIMjBWMTVIMTl6TTIwLDE0SDIxVjE1SDIwek0yMywxNEgyNFYxNUgyM3pNMiwxNUgzVjE2SDJ6TTQsMTVINVYxNkg0ek01LDE1SDZWMTZINXpNNywxNUg4VjE2SDd6TTksMTVIMTBWMTZIOXpNMTAsMTVIMTFWMTZIMTB6TTEyLDE1SDEzVjE2SDEyek0xNiwxNUgxN1YxNkgxNnpNMjAsMTVIMjFWMTZIMjB6TTIxLDE1SDIyVjE2SDIxek0yMywxNUgyNFYxNkgyM3pNMjQsMTVIMjVWMTZIMjR6TTI2LDE1SDI3VjE2SDI2ek0yLDE2SDNWMTdIMnpNNCwxNkg1VjE3SDR6TTUsMTZINlYxN0g1ek03LDE2SDhWMTdIN3pNOCwxNkg5VjE3SDh6TTEwLDE2SDExVjE3SDEwek0xMiwxNkgxM1YxN0gxMnpNMTMsMTZIMTRWMTdIMTN6TTE0LDE2SDE1VjE3SDE0ek0xNSwxNkgxNlYxN0gxNXpNMTcsMTZIMThWMTdIMTd6TTIxLDE2SDIyVjE3SDIxek0yMiwxNkgyM1YxN0gyMnpNMjUsMTZIMjZWMTdIMjV6TTI2LDE2SDI3VjE3SDI2ek0yLDE3SDNWMThIMnpNNiwxN0g3VjE4SDZ6TTEwLDE3SDExVjE4SDEwek0xMiwxN0gxM1YxOEgxMnpNMTMsMTdIMTRWMThIMTN6TTE2LDE3SDE3VjE4SDE2ek0xNywxN0gxOFYxOEgxN3pNMTgsMTdIMTlWMThIMTh6TTE5LDE3SDIwVjE4SDE5ek0yMCwxN0gyMVYxOEgyMHpNMjEsMTdIMjJWMThIMjF6TTIyLDE3SDIzVjE4SDIyek0yMywxN0gyNFYxOEgyM3pNMjUsMTdIMjZWMThIMjV6TTIsMThIM1YxOUgyek00LDE4SDVWMTlINHpNNiwxOEg3VjE5SDZ6TTcsMThIOFYxOUg3ek04LDE4SDlWMTlIOHpNOSwxOEgxMFYxOUg5ek0xMSwxOEgxMlYxOUgxMXpNMTMsMThIMTRWMTlIMTN6TTE1LDE4SDE2VjE5SDE1ek0xNywxOEgxOFYxOUgxN3pNMTgsMThIMTlWMTlIMTh6TTE5LDE4SDIwVjE5SDE5ek0yMCwxOEgyMVYxOUgyMHpNMjEsMThIMjJWMTlIMjF6TTIyLDE4SDIzVjE5SDIyek0yNCwxOEgyNVYxOUgyNHpNMjUsMThIMjZWMTlIMjV6TTI2LDE4SDI3VjE5SDI2ek0xMCwxOUgxMVYyMEgxMHpNMTQsMTlIMTVWMjBIMTR6TTE1LDE5SDE2VjIwSDE1ek0xNiwxOUgxN1YyMEgxNnpNMTgsMTlIMTlWMjBIMTh6TTIyLDE5SDIzVjIwSDIyek0yMywxOUgyNFYyMEgyM3pNMjQsMTlIMjVWMjBIMjR6TTI1LDE5SDI2VjIwSDI1ek0yNiwxOUgyN1YyMEgyNnpNMiwyMEgzVjIxSDJ6TTMsMjBINFYyMUgzek00LDIwSDVWMjFINHpNNSwyMEg2VjIxSDV6TTYsMjBIN1YyMUg2ek03LDIwSDhWMjFIN3pNOCwyMEg5VjIxSDh6TTE1LDIwSDE2VjIxSDE1ek0xNywyMEgxOFYyMUgxN3pNMTgsMjBIMTlWMjFIMTh6TTIwLDIwSDIxVjIxSDIwek0yMiwyMEgyM1YyMUgyMnpNMjMsMjBIMjRWMjFIMjN6TTI0LDIwSDI1VjIxSDI0ek0yNSwyMEgyNlYyMUgyNXpNMjYsMjBIMjdWMjFIMjZ6TTIsMjFIM1YyMkgyek04LDIxSDlWMjJIOHpNMTAsMjFIMTFWMjJIMTB6TTExLDIxSDEyVjIySDExek0xNCwyMUgxNVYyMkgxNHpNMTYsMjFIMTdWMjJIMTZ6TTE4LDIxSDE5VjIySDE4ek0yMiwyMUgyM1YyMkgyMnpNMjUsMjFIMjZWMjJIMjV6TTIsMjJIM1YyM0gyek00LDIySDVWMjNINHpNNSwyMkg2VjIzSDV6TTYsMjJIN1YyM0g2ek04LDIySDlWMjNIOHpNMTAsMjJIMTFWMjNIMTB6TTEyLDIySDEzVjIzSDEyek0xNCwyMkgxNVYyM0gxNHpNMTUsMjJIMTZWMjNIMTV6TTE3LDIySDE4VjIzSDE3ek0xOCwyMkgxOVYyM0gxOHpNMTksMjJIMjBWMjNIMTl6TTIwLDIySDIxVjIzSDIwek0yMSwyMkgyMlYyM0gyMXpNMjIsMjJIMjNWMjNIMjJ6TTI1LDIySDI2VjIzSDI1ek0yNiwyMkgyN1YyM0gyNnpNMiwyM0gzVjI0SDJ6TTQsMjNINVYyNEg0ek01LDIzSDZWMjRINXpNNiwyM0g3VjI0SDZ6TTgsMjNIOVYyNEg4ek0xMCwyM0gxMVYyNEgxMHpNMTEsMjNIMTJWMjRIMTF6TTE1LDIzSDE2VjI0SDE1ek0xNiwyM0gxN1YyNEgxNnpNMTgsMjNIMTlWMjRIMTh6TTE5LDIzSDIwVjI0SDE5ek0yMCwyM0gyMVYyNEgyMHpNMjMsMjNIMjRWMjRIMjN6TTI1LDIzSDI2VjI0SDI1ek0yNiwyM0gyN1YyNEgyNnpNMiwyNEgzVjI1SDJ6TTQsMjRINVYyNUg0ek01LDI0SDZWMjVINXpNNiwyNEg3VjI1SDZ6TTgsMjRIOVYyNUg4ek0xMCwyNEgxMVYyNUgxMHpNMTIsMjRIMTNWMjVIMTJ6TTEzLDI0SDE0VjI1SDEzek0xNCwyNEgxNVYyNUgxNHpNMTUsMjRIMTZWMjVIMTV6TTE3LDI0SDE4VjI1SDE3ek0xOCwyNEgxOVYyNUgxOHpNMjAsMjRIMjFWMjVIMjB6TTIxLDI0SDIyVjI1SDIxek0yNCwyNEgyNVYyNUgyNHpNMjYsMjRIMjdWMjVIMjZ6TTIsMjVIM1YyNkgyek04LDI1SDlWMjZIOHpNMTEsMjVIMTJWMjZIMTF6TTEzLDI1SDE0VjI2SDEzek0xNiwyNUgxN1YyNkgxNnpNMTgsMjVIMTlWMjZIMTh6TTIyLDI1SDIzVjI2SDIyek0yMywyNUgyNFYyNkgyM3pNMjYsMjVIMjdWMjZIMjZ6TTIsMjZIM1YyN0gyek0zLDI2SDRWMjdIM3pNNCwyNkg1VjI3SDR6TTUsMjZINlYyN0g1ek02LDI2SDdWMjdINnpNNywyNkg4VjI3SDd6TTgsMjZIOVYyN0g4ek0xMCwyNkgxMVYyN0gxMHpNMTEsMjZIMTJWMjdIMTF6TTEyLDI2SDEzVjI3SDEyek0xMywyNkgxNFYyN0gxM3pNMTQsMjZIMTVWMjdIMTR6TTE3LDI2SDE4VjI3SDE3ek0xOSwyNkgyMFYyN0gxOXpNMjAsMjZIMjFWMjdIMjB6TTIyLDI2SDIzVjI3SDIyek0yNCwyNkgyNVYyN0gyNHpNMjUsMjZIMjZWMjdIMjV6TTI2LDI2SDI3VjI3SDI2eiIgaWQ9InFyLXBhdGgiIGZpbGw9IiMwMDAwMDAiIGZpbGwtb3BhY2l0eT0iMSIgZmlsbC1ydWxlPSJub256ZXJvIiBzdHJva2U9Im5vbmUiIC8+PC9zdmc+';      // WiFi-join QR (injected from wifi_qr_datauri.txt)
 // True only inside the packaged app (Capacitor native platform + BLE plugin present).
 function isNative(){ return !!(window.Capacitor && window.Capacitor.isNativePlatform &&
                                window.Capacitor.isNativePlatform() && window.BleClient); }
+// True in the dongle-served copy (FORCE_HTTP) or when loaded over plain HTTP from the
+// dongle. On the HTTPS GitHub copy this is false, so BLE is used there instead.
+function canUseHTTP(){ return FORCE_HTTP || (!window.isSecureContext && location.protocol==='http:'); }
 
 function statusUI(state,text){
   const dot=document.getElementById('dot');
@@ -568,6 +581,29 @@ function statusUI(state,text){
   const b=document.getElementById('connectBtn');
   b.textContent = connected ? 'Disconnect' : 'Connect';
 }
+
+// Td5/ECU indicator (separate from the WiFi/BLE link dot). The ECU is "connected"
+// when fresh data is actually arriving; the firmware returns NO DATA while the K-line
+// isn't up, so freshness == ECU connected.
+function ecuUI(state){
+  const d=document.getElementById('ecuDot'); if(d) d.className='dot '+state;
+  const t=document.getElementById('ecuText'); if(t) t.textContent = state==='on' ? 'Td5 ✓' : 'Td5';
+}
+
+// Supervisor: keeps the Td5 indicator live and, for the dongle-served copy, keeps the
+// WiFi connection + polling alive so live data flows whenever the ECU becomes available
+// - no page refresh needed. Green = ECU data arriving; amber = dongle up but ECU not
+// answering yet; grey = dongle link down.
+const ECU_STALE_MS=5000;
+function supervise(){
+  const fresh = lastSampleTs && (Date.now()-lastSampleTs) < ECU_STALE_MS;
+  ecuUI(!connected ? 'off' : (fresh ? 'on' : 'busy'));
+  if(FORCE_HTTP){                              // the dongle is always there
+    if(!connected && !connecting) connect(false);     // recover a failed/dropped connect
+    else if(connected && !polling) startPolling();    // make sure polling is running
+  }
+}
+setInterval(supervise, 2000);
 
 /* Both transports funnel their notification bytes through handleRx(). */
 function handleRx(s){
@@ -592,7 +628,13 @@ function sendNow(cmd){
     pending={resolve, timer:setTimeout(()=>{ if(pending){pending=null; resolve('TIMEOUT'); } },2500)};
     const bytes=new TextEncoder().encode(cmd+'\r');
     try{
-      if(isNative()){
+      if(isUsingHTTP){
+        // WiFi transport: one POST per command. The dongle's reply already ends with
+        // the '>' prompt, so feed it straight into the shared handleRx().
+        const r=await fetch('/elm',{method:'POST',body:cmd,headers:{'Content-Type':'text/plain'}});
+        if(!r.ok){ if(pending){ pending=null; clearTimeout(pending.timer); resolve(r.status===503?'BUSY':'ERR'); } return; }
+        handleRx(await r.text());
+      } else if(isNative()){
         await window.BleClient.writeWithoutResponse(nativeDevId, SVC128, WRITE128,
               new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength));
       } else {
@@ -604,14 +646,19 @@ function sendNow(cmd){
 }
 
 async function connect(fromClick){
+  if(connecting) return;                        // no overlapping attempts (the supervisor retries)
+  connecting=true;
   try{
     statusUI('busy','Connecting...');
-    if(isNative()) await connectNative(fromClick);
-    else           await connectWeb(fromClick);
+    if(FORCE_HTTP)               await connectHTTP(fromClick);   // dongle copy: WiFi only, never BLE
+    else if(isNative())          await connectNative(fromClick);
+    else if(canUseHTTP())        await connectHTTP(fromClick);
+    else if(navigator.bluetooth) await connectWeb(fromClick);
+    else { statusUI('off','Disconnected'); showWifiHelp(); }
   }catch(err){
     connected=false; statusUI('off','Disconnected');
     if(fromClick) toast('Connection failed: '+(err.message||err));
-  }
+  } finally { connecting=false; }
 }
 
 /* Browser transport: Web Bluetooth. */
@@ -634,6 +681,48 @@ async function connectWeb(fromClick){
   await notifyChar.startNotifications();
   notifyChar.addEventListener('characteristicvaluechanged',onNotify);
   await afterConnect(device.name||'Connected');
+}
+
+/* Browser-over-WiFi transport: the dongle serves this page and answers ELM over
+   HTTP (POST /elm). Auto-selected when opened from the dongle (http://10.0.0.1) -
+   the path iOS Safari and any browser can use. */
+async function connectHTTP(fromClick){
+  isUsingHTTP=true; connected=true; chain=Promise.resolve();
+  const probe=await send('ATZ');                // validate the bridge + claim the WiFi session
+  if(probe==='ERR'||probe==='TIMEOUT'||probe==='BUSY'){
+    connected=false; isUsingHTTP=false; statusUI('off','Disconnected');
+    if(probe==='BUSY') toast('Dongle is busy on Bluetooth');
+    else if(fromClick) showWifiHelp();
+    return;
+  }
+  await afterConnect('WiFi');
+}
+
+/* Shown when the browser can't do Bluetooth and isn't served by the dongle
+   (iOS Safari opening the GitHub link): guide the user onto the dongle's WiFi. */
+function showWifiHelp(){
+  let m=document.getElementById('wifiHelp');
+  if(!m){
+    m=document.createElement('div'); m.id='wifiHelp';
+    m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);color:#eee;z-index:9999;'+
+      'display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;'+
+      'padding:1.5em;font-family:system-ui,sans-serif';
+    m.innerHTML=
+      '<h2 style="margin:.2em">Use over WiFi</h2>'+
+      '<p style="max-width:22em;opacity:.9">This browser can\'t use Bluetooth (Apple blocks it in Safari). '+
+      'Connect over WiFi instead:</p>'+
+      '<ol style="text-align:left;max-width:22em;line-height:1.7">'+
+      '<li>Join WiFi <b>OBDII</b> (no password)</li>'+
+      '<li>Open <a href="http://10.0.0.1/" style="color:#5cf"><b>http://10.0.0.1</b></a></li></ol>'+
+      '<img alt="Scan to join OBDII WiFi" src="'+WIFI_QR_SVG+'" '+
+      'style="width:180px;height:180px;background:#fff;padding:8px;border-radius:8px;margin:.5em 0">'+
+      '<p style="opacity:.7;font-size:.9em;max-width:22em">Scan to join the WiFi, then open the address above.</p>'+
+      '<button id="wifiHelpClose" style="margin-top:1em;padding:.7em 1.6em;border:0;border-radius:8px;'+
+      'background:#2a9d6b;color:#fff;font-size:1em">Close</button>';
+    document.body.appendChild(m);
+    m.querySelector('#wifiHelpClose').addEventListener('click',()=>{ m.style.display='none'; });
+  }
+  m.style.display='flex';
 }
 
 /* Packaged-app transport: @capacitor-community/bluetooth-le. */
@@ -1167,6 +1256,7 @@ document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()
 })();
 // Buttons
 document.getElementById('connectBtn').addEventListener('click',()=>{ connected?disconnect():connect(true); });
+if(FORCE_HTTP){ const _cb=document.getElementById('connectBtn'); if(_cb) _cb.style.display='none'; }  // dongle copy auto-connects over WiFi
 document.getElementById('readDtcBtn').addEventListener('click',()=>readDtcs());
 document.getElementById('clearDtcBtn').addEventListener('click',()=>clearDtcs());
 document.getElementById('logChk').addEventListener('change',e=>{ e.target.checked ? startLog() : stopLog(); });
@@ -1179,7 +1269,7 @@ window.addEventListener('load',()=>{
   // "Download log now" only does something in a browser (the app streams to
   // Documents already), so hide it in the native app.
   if(fsPlugin()){ const b=document.getElementById('dlLogBtn'); if(b) b.style.display='none'; }
-  if(isNative() || (navigator.bluetooth&&navigator.bluetooth.getDevices)) connect(false);
+  if(isNative() || canUseHTTP() || (navigator.bluetooth&&navigator.bluetooth.getDevices)) connect(false);
 });
 </script>
 </body>
