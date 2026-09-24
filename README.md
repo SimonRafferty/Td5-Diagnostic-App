@@ -16,7 +16,7 @@ There are two ways to talk to the dongle - **WiFi** (the easy route; works on ev
 The dongle hosts the whole app itself, so **any device with a browser** can use it - nothing to install, no Bluetooth, and it works on iOS where browsers aren't allowed to use Bluetooth.
 
 1. Connect your phone, tablet or PC to the open WiFi network **`OBDII`** (no password).
-2. Open a browser and go to **http://10.0.0.1**.
+2. Open a browser and go to **http://11.1.1.1**.
 
 That's it.  (While you're on the dongle's WiFi your device has no internet, so online fault-code look-ups won't work - use Bluetooth below if you need those.)
 
@@ -52,7 +52,7 @@ The whole app is packaged as a single, self-contained web page - [**Td5-Diagnost
 
 ### iPhone and iPad
 
-The easiest route on an iPhone or iPad is **WiFi** - join the **`OBDII`** network and open **http://10.0.0.1** (see *Connecting to the Dongle* above); Safari handles that fine.  Safari can't use Web *Bluetooth*, so if you'd rather connect over Bluetooth (to keep your internet), install the free **Bluefy** browser and open [the app page](https://simonrafferty.github.io/Td5-Diagnostic-App/Td5-Diagnostic.html).  
+The easiest route on an iPhone or iPad is **WiFi** - join the **`OBDII`** network and open **http://11.1.1.1** (see *Connecting to the Dongle* above); Safari handles that fine.  Safari can't use Web *Bluetooth*, so if you'd rather connect over Bluetooth (to keep your internet), install the free **Bluefy** browser and open [the app page](https://simonrafferty.github.io/Td5-Diagnostic-App/Td5-Diagnostic.html).  
 
 ## What the App Does
 
@@ -82,7 +82,7 @@ On the **Available Data** tab there's a single **Log displayed items to CSV** ti
 
 | Folder | Contents |
 |--------|----------|
-| `Firmware/` | The ESP32-S3 dongle firmware (Arduino).  It turns the K-Line interface into an ELM327 the app - and other OBD2 apps - can talk to over **Bluetooth**, and also hosts the app over **WiFi** (open `OBDII` network, http://10.0.0.1). |
+| `Firmware/` | The ESP32-S3 dongle firmware (Arduino).  It turns the K-Line interface into an ELM327 the app - and other OBD2 apps - can talk to over **Bluetooth**, and also hosts the app over **WiFi** (open `OBDII` network, http://11.1.1.1). |
 | `App/` | The Android app project (built with Capacitor) used to produce the APK. |
 | `Hardware/` | The complete dongle design: PCB gerbers, schematic, BOM, pick-and-place, Altium source, and 3D-printable case halves. |
 | [`Td5-Diagnostics-debug.apk`](Td5-Diagnostics-debug.apk) | The ready-to-install Android app. |

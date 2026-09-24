@@ -58,10 +58,11 @@
 // the TCP layer (see WifiElmServer), NOT by limiting WiFi stations.
 #define AP_MAX_CLIENTS    4
 
-#define ELM_AP_IP_0       10
-#define ELM_AP_IP_1       0
-#define ELM_AP_IP_2       0
-#define ELM_AP_IP_3       1              // ESP32 will be 10.0.0.1 (clear of the user's 192.168.x / 172.22.x)
+#define ELM_AP_IP_0       11
+#define ELM_AP_IP_1       1
+#define ELM_AP_IP_2       1
+#define ELM_AP_IP_3       1              // ESP32 = 11.1.1.1 (short, printable on the case; clear of every
+                                         // host interface: 10.0.0 GL.iNet / 192.168.4 / 192.168.1 / 172.22)
 #define ELM_TCP_PORT      35000
 
 // ---------------------------------------------------------------------------
@@ -91,7 +92,8 @@
 //                          comparator - D4 would float and could sleep at random)
 //
 // Pin assignments CONFIRMED on the V2 PCB (2026-09-20): D3=GPIO4, D4=GPIO5.
-#define ENABLE_DEEP_SLEEP        1
+#define ENABLE_DEEP_SLEEP        1        // 1 = vehicle: comparator-gated sleep (wake on engine start,
+                                          // sleep ~5 min after engine off). Set 0 for bench (AP never sleeps).
 
 #define PIN_VBAT_SENSE           GPIO_NUM_4   // D3 - ADC1_CH3, battery divider tap (47k/10k)
 #define PIN_CHG_SENSE            GPIO_NUM_5   // D4 - RTC-capable, TLV3691 out / EXT0 wake

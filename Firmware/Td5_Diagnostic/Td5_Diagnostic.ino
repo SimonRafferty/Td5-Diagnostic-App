@@ -212,7 +212,7 @@ void setup() {
   Serial.println(F("Transport: WiFi AP (Torque TCP)"));
 #endif
 #if ENABLE_WIFI_WEBAPP
-  Serial.println(F("Transport: WiFi web app (SoftAP \"" AP_SSID "\" @ 10.0.0.1, open)"));
+  Serial.println(F("Transport: WiFi web app (SoftAP \"" AP_SSID "\" @ 11.1.1.1, open)"));
 #endif
 
 #if ENABLE_DEEP_SLEEP

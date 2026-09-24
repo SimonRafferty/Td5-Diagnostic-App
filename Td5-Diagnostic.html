@@ -152,7 +152,7 @@
       </div>
     </div>
     <div class="card">
-      <h2>Stored fault codes</h2>
+      <h2>Stored fault codes <span class="muted small">(Lucas X-Y)</span></h2>
       <div id="dtcList"><div class="empty">Not read yet. Connect and tap "Read Codes".</div></div>
     </div>
   </section>
@@ -196,6 +196,8 @@
 
 <div id="toast"></div>
 
+<!-- Standalone browser build: talks straight to the Web Bluetooth API. The
+     native ble-shim.js bridge is only needed inside the Capacitor APK. -->
 <!-- Standalone browser build: talks straight to the Web Bluetooth API. The
      native ble-shim.js bridge is only needed inside the Capacitor APK. -->
 <script>
@@ -307,7 +309,10 @@ const PIDS = [
   mk('volt',  'Module Voltage',     '0142', '4142', 2, d=>(d[0]*256+d[1])/1000,     U.volt, 1, true,  0x40, 0x42),
   mkc('bvd',  'Battery Direct',    '22F029','62F029',2,d=>(d[0]*256+d[1])/1000,U.volt,2, true),
   // --- Driveline ---
-  mkc('gear', 'Selected Gear',  '22F009','62F009', 1, d=>d[0],                  U.gear, 0, true)
+  // Hidden for now: the Td5 engine ECU doesn't report selected gear (the XYZ switch feeds the
+  // auto/EAT ECU, not the engine ECU we talk to). Code kept (gearLabel/fmt/fillDemo gear) so it
+  // can be re-enabled instantly if a real gear source is wired up. Uncomment to restore.
+  // mkc('gear', 'Selected Gear',  '22F009','62F009', 1, d=>d[0],                  U.gear, 0, true)
 ];
 function mk(key,name,cmd,prefix,bytes,decode,unit,dec,graph,range,bit){
   return {key,name,cmd,prefix,bytes,decode,unit,dec,graph,std:true,range,bit,
@@ -536,18 +541,16 @@ const TD5_DTC_TABLE = [
   [35,5,"Injector 5 partial short circuit (L)","P0205"],
   [35,6,"Injector 6 partial short circuit (L)","P0206"]
 ];
-const TD5_XY = {}, PCODE_DESC = {};
-for (const r of TD5_DTC_TABLE){ TD5_XY[r[0]+'-'+r[1]] = r[2];
-  if (r[3]){ const b=r[2].replace(/\s*\((L|C)\)\s*$/,''); if(!PCODE_DESC[r[3]]) PCODE_DESC[r[3]]=b; } }
-// A received DTC is either a real inferred OBD code, or a synthesised P(0x1000+bitIndex)
-// for a Td5 fault with no OBD equivalent - reverse the latter to its Td5 X-Y description.
-function dtcInfo(code){
-  const hex = parseInt(code.slice(1),16);
-  if (code[0]==='P' && hex>=0x1000 && hex<=0x1000+279){
-    const raw=hex-0x1000, x=(raw>>3)+1, y=(raw&7)+1, d=TD5_XY[x+'-'+y];
-    return { desc: d||('Undefined Td5 fault bit '+x+'-'+y), tag:''+x+'-'+y };
-  }
-  return { desc: PCODE_DESC[code]||'Manufacturer-specific code', tag:code };
+// Lucas X-Y -> description. (The old P-code column r[3] is no longer used: the dongle
+// reports raw X-Y fault codes now, not OBD P-codes, so we don't map to/from P-codes.)
+const TD5_XY = {};
+for (const r of TD5_DTC_TABLE) TD5_XY[r[0]+'-'+r[1]] = r[2];
+// The dongle reports each stored fault as its raw Lucas X-Y code (X = 1-based byte,
+// Y = 1-based bit in the Td5 fault bitfield). Look the pair up for its description.
+function dtcInfo(x,y){
+  if (x===255) return { code:'DEMO', desc:'Demo Mode - simulated data (no ECU connected)' };
+  const tag = x+'-'+y;
+  return { code: tag, desc: TD5_XY[tag] || ('Undefined Td5 fault '+tag) };
 }
 
 /* ===================================================================== *
@@ -628,7 +631,7 @@ function sendNow(cmd){
         // WiFi transport: one POST per command. The dongle's reply already ends with
         // the '>' prompt, so feed it straight into the shared handleRx().
         const r=await fetch('/elm',{method:'POST',body:cmd,headers:{'Content-Type':'text/plain'}});
-        if(!r.ok){ if(pending){ pending=null; clearTimeout(pending.timer); resolve(r.status===503?'BUSY':'ERR'); } return; }
+        if(!r.ok){ if(pending){ clearTimeout(pending.timer); pending=null; resolve(r.status===503?'BUSY':'ERR'); } return; }
         handleRx(await r.text());
       } else if(isNative()){
         await window.BleClient.writeWithoutResponse(nativeDevId, SVC128, WRITE128,
@@ -637,7 +640,7 @@ function sendNow(cmd){
         try{ await writeChar.writeValueWithoutResponse(bytes); }
         catch(e){ await writeChar.writeValue(bytes); }
       }
-    }catch(err){ if(pending){ pending=null; clearTimeout(pending.timer); resolve('ERR'); } }
+    }catch(err){ if(pending){ clearTimeout(pending.timer); pending=null; resolve('ERR'); } }
   });
 }
 
@@ -680,7 +683,7 @@ async function connectWeb(fromClick){
 }
 
 /* Browser-over-WiFi transport: the dongle serves this page and answers ELM over
-   HTTP (POST /elm). Auto-selected when opened from the dongle (http://10.0.0.1) -
+   HTTP (POST /elm). Auto-selected when opened from the dongle (http://11.1.1.1) -
    the path iOS Safari and any browser can use. */
 async function connectHTTP(fromClick){
   isUsingHTTP=true; connected=true; chain=Promise.resolve();
@@ -709,7 +712,7 @@ function showWifiHelp(){
       'Connect over WiFi instead:</p>'+
       '<ol style="text-align:left;max-width:22em;line-height:1.7">'+
       '<li>Join WiFi <b>OBDII</b> (no password)</li>'+
-      '<li>Open <a href="http://10.0.0.1/" style="color:#5cf"><b>http://10.0.0.1</b></a></li></ol>'+
+      '<li>Open <a href="http://11.1.1.1/" style="color:#5cf"><b>http://11.1.1.1</b></a></li></ol>'+
       '<img alt="Scan to join OBDII WiFi" src="'+WIFI_QR_SVG+'" '+
       'style="width:180px;height:180px;background:#fff;padding:8px;border-radius:8px;margin:.5em 0">'+
       '<p style="opacity:.7;font-size:.9em;max-width:22em">Scan to join the WiFi, then open the address above.</p>'+
@@ -935,26 +938,21 @@ async function readDtcs(){
   const s=await send('0101'); const st=tok(s);
   let mil=false, cnt=0; const i=st.indexOf('41');
   if(i>=0 && (st[i+1]||'')==='01'){ const A=parseInt(st[i+2],16); if(!isNaN(A)){ mil=(A&0x80)!==0; cnt=A&0x7F; } }
-  // Stored codes from mode 03.
+  // Stored faults from mode 03. The dongle reports raw Td5 (Lucas) X-Y pairs (one byte
+  // each) - NOT packed OBD DTC bytes - since our app is the only consumer.
   const r=await send('03'); const t=tok(r);
   const j=t.indexOf('43');
-  const codes=[];
+  const faults=[];
   if(j>=0){
     let count=parseInt(t[j+1],16); if(isNaN(count)) count=0;
     for(let k=0;k<count;k++){
-      const a=parseInt(t[j+2+k*2],16), b=parseInt(t[j+3+k*2],16);
-      if(isNaN(a)||isNaN(b)) break;
-      if(a===0&&b===0) continue;
-      codes.push(dtcCode(a,b));
+      const x=parseInt(t[j+2+k*2],16), y=parseInt(t[j+3+k*2],16);
+      if(isNaN(x)||isNaN(y)) break;
+      if(x===0&&y===0) continue;
+      faults.push({x,y});
     }
   }
-  renderDtcs(mil,cnt,codes);
-}
-
-function dtcCode(a,b){
-  const T=['P','C','B','U'][(a>>6)&3];
-  return T + ((a>>4)&3) + (a&0x0F).toString(16).toUpperCase()
-           + b.toString(16).toUpperCase().padStart(2,'0');
+  renderDtcs(mil,cnt,faults);
 }
 
 async function clearDtcs(){
@@ -965,22 +963,21 @@ async function clearDtcs(){
   else toast('Clear not confirmed by ECU');
 }
 
-function renderDtcs(mil,cnt,codes){
+function renderDtcs(mil,cnt,faults){
   const badge=document.getElementById('milBadge');
   badge.className='badge '+(mil?'bad':'ok');
   badge.textContent = mil?'ON':'Off';
   document.getElementById('dtcCount').textContent =
-    (cnt||codes.length) ? ('reported count: '+(cnt||codes.length)) : '';
+    (cnt||faults.length) ? ('reported count: '+(cnt||faults.length)) : '';
   const list=document.getElementById('dtcList');
-  if(!codes.length){ list.innerHTML='<div class="empty">No stored fault codes.</div>'; return; }
+  if(!faults.length){ list.innerHTML='<div class="empty">No stored fault codes.</div>'; return; }
   list.innerHTML='';
-  for(const c of codes){
-    const info=dtcInfo(c);
-    const desc=info.desc;
-    const q=encodeURIComponent('Land Rover Td5 '+info.desc+' '+info.tag);
+  for(const f of faults){
+    const info=dtcInfo(f.x,f.y);
+    const q=encodeURIComponent('Land Rover Td5 fault '+info.code+' '+info.desc);
     const row=el('div','dtc');
-    row.innerHTML=`<span class="code">${c}</span>`+
-                  `<span class="desc">${esc(desc)}</span>`+
+    row.innerHTML=`<span class="code">${info.code}</span>`+
+                  `<span class="desc">${esc(info.desc)}</span>`+
                   `<a href="https://www.google.com/search?q=${q}" target="_blank" rel="noopener">Search online</a>`;
     list.appendChild(row);
   }
@@ -1075,10 +1072,18 @@ function shownValue(p,raw){
   if(raw===null||raw===undefined) return null;
   return (p.unit.alt && p.unitSel==='imperial') ? p.unit.conv(raw) : raw;
 }
+function gearLabel(v){
+  // Map the raw gear byte to a label: 0=N, 1..6 = gears, 7=R, 8=P, 9=D. (The Td5 engine ECU
+  // doesn't report a selected gear, so this is only meaningful in demo mode - on a vehicle
+  // "Selected Gear" reads N.)
+  const g={0:'N',1:'1',2:'2',3:'3',4:'4',5:'5',6:'6',7:'R',8:'P',9:'D'};
+  const k=Math.round(v);
+  return (g[k]!==undefined) ? g[k] : String(k);
+}
 function fmt(p,raw){
   const v=shownValue(p,raw);
   if(v===null) return '—';
-  if(p.unit===U.gear) return String(Math.round(v));
+  if(p.unit===U.gear) return gearLabel(v);
   return v.toFixed(p.dec);
 }
 

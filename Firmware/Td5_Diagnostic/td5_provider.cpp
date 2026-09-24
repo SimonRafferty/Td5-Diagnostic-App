@@ -400,8 +400,8 @@ void Td5Provider::fillDemo() {
   if (_demoFaultsCleared) {
     _d.dtcCount = 0;
   } else {
-    _d.dtcs[0] = { 42,  6, 3, 'P', 0x0115, "Coolant temp sensor circuit" };
-    _d.dtcs[1] = { 90, 12, 3, 'P', 0x1668, "Injector cylinder circuit (Td5)" };
+    _d.dtcs[0] = {  42,  6, 3, 'P', 0x0115, "Coolant temp circuit (C)" };
+    _d.dtcs[1] = { 256, 33, 1, 'P', 0x0201, "Injector 1 open circuit (C)" };
     _d.dtcCount = 2;
   }
 

@@ -50,19 +50,8 @@ static const uint8_t SUPPORTED_01[] = {
 };
 static const uint8_t SUPPORTED_01_COUNT = sizeof(SUPPORTED_01) / sizeof(SUPPORTED_01[0]);
 
-// Encode a DTC (type + 4 hex digits, e.g. 'P',0x1668) into its two OBD bytes.
-static void encodeDtc(char type, uint16_t code, uint8_t& a, uint8_t& b) {
-  uint8_t typeBits;
-  switch (type) {
-    case 'C': typeBits = 1; break;
-    case 'B': typeBits = 2; break;
-    case 'U': typeBits = 3; break;
-    default:  typeBits = 0; break;   // 'P'
-  }
-  uint8_t d1 = (code >> 12) & 0x0F;          // first digit after the letter (0..3)
-  a = (uint8_t)((typeBits << 6) | ((d1 & 0x03) << 4) | ((code >> 8) & 0x0F));
-  b = (uint8_t)(code & 0xFF);
-}
+// (The former OBD DTC packer was removed: the dongle now reports raw Lucas X-Y fault codes
+//  over mode 03 - see mode03() - because our own app is the only consumer.)
 
 // ---------------------------------------------------------------------------
 // Public entry point
@@ -253,13 +242,14 @@ String ObdTranslator::mode03() {
   uint8_t n = d.dtcCount;
   if (n > MAX_DTCS) n = MAX_DTCS;
 
-  // CAN-style mode 03: "43 <count> <DTC pairs...>"
+  // Mode 03 now carries the raw Lucas X-Y fault codes (one byte each) - NOT OBD DTC bytes.
+  // We own both ends (embedded web app + our BLE app), so there's no P-code packing; the app
+  // renders "X-Y" plus the description from its Td5 fault table. The "43 <count>" framing is
+  // kept so the existing app parser and command flow are unchanged.
   String body = "43 " + hx(n);
   for (uint8_t i = 0; i < n; i++) {
-    uint8_t a, b;
-    encodeDtc(d.dtcs[i].type, d.dtcs[i].code, a, b);
-    body += ' '; body += hx(a);
-    body += ' '; body += hx(b);
+    body += ' '; body += hx(d.dtcs[i].x);
+    body += ' '; body += hx(d.dtcs[i].y);
   }
   return body;
 }
