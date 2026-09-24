@@ -5,8 +5,7 @@
   "description": "Td5 Diagnostics - BLE OBD client for the Td5 ELM327 dongle",
   "scripts": {
     "bundle": "esbuild src/ble-shim.js --bundle --format=iife --outfile=www/ble-shim.js",
-    "sync": "npm run bundle && cap sync android",
-    "single": "node build-single.mjs"
+    "sync": "npm run bundle && cap sync android"
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "^6.0.1",

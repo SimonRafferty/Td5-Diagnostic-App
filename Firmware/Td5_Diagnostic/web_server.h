@@ -7,7 +7,7 @@
  * iOS Safari (which has no Web Bluetooth) and any browser can use.
  *
  * Routes (port WEBAPP_HTTP_PORT):
- *   GET  /        -> the gzipped single-file app (Td5-Diagnostic.html) from PROGMEM
+ *   GET  /        -> the gzipped web app (App/www/index.html, ble-shim stripped) from PROGMEM
  *   POST /elm     -> claim the WiFi session, run Elm327::handleLine(body), return the reply
  *   GET  <other>  -> small no-JS captive landing page pointing at the app (mini-browsers can't run the SPA)
  *
