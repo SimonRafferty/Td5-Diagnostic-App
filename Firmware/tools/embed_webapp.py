@@ -55,8 +55,8 @@ with open(SRC, 'rb') as f:
 data = data.replace(b'\r\n', b'\n')
 
 # 1) Strip the APK-only native BLE bridge (its comment block + the <script> tag).
-REPLACEMENT = (b'<!-- Standalone browser build: talks straight to the Web Bluetooth API. The\n'
-               b'     native ble-shim.js bridge is only needed inside the Capacitor APK. -->')
+REPLACEMENT = (b'<!-- Native BLE bridge (ble-shim.js) omitted: this is the dongle-served copy,\n'
+               b'     which talks to the dongle over HTTP, not Bluetooth. -->')
 stripped = re.sub(rb'<!--\s*Native BLE bridge[\s\S]*?-->\s*<script src="ble-shim\.js"></script>',
                   lambda m: REPLACEMENT, data, count=1)
 if stripped == data:  # fall back to just the tag if the comment ever changes
