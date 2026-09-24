@@ -18,16 +18,13 @@ The dongle hosts the whole app itself, so **any device with a browser** can use 
 1. Connect your phone, tablet or PC to the open WiFi network **`OBDII`** (no password).
 2. Open a browser and go to **http://11.1.1.1**.
 
-That's it.  (While you're on the dongle's WiFi your device has no internet, so online fault-code look-ups won't work - use Bluetooth below if you need those.)
 
 ### Bluetooth (BLE) - when you want to keep your internet
 
 Connecting over Bluetooth leaves your phone on its normal WiFi/mobile data, so online DTC look-ups keep working.  Two ways:
 
 - **The Android app** - install the [APK](Td5-Diagnostics-debug.apk) (see *Installing the App* below), tap **Connect**, and choose **OBDII**.
-- **The web page over Bluetooth** - open [the app page](https://simonrafferty.github.io/Td5-Diagnostic-App/Td5-Diagnostic.html) in **Chrome or Edge** (Android/PC), or in the free **Bluefy** browser on **iPhone/iPad**, and tap **Connect**.
 
-Generic BLE OBD apps (e.g. EOBD-Facile) work too - look for a Bluetooth device called **OBDII**.  (Torque isn't supported: it needs classic Bluetooth, which the ESP32-S3 doesn't have.)
 
 > The dongle serves **one connection at a time** - whichever you connect with first (WiFi or Bluetooth) is used for that session, and the other is disabled until the dongle restarts (it restarts each time the engine starts).
 
@@ -52,7 +49,7 @@ The whole app is packaged as a single, self-contained web page - [**Td5-Diagnost
 
 ### iPhone and iPad
 
-The easiest route on an iPhone or iPad is **WiFi** - join the **`OBDII`** network and open **http://11.1.1.1** (see *Connecting to the Dongle* above); Safari handles that fine.  Safari can't use Web *Bluetooth*, so if you'd rather connect over Bluetooth (to keep your internet), install the free **Bluefy** browser and open [the app page](https://simonrafferty.github.io/Td5-Diagnostic-App/Td5-Diagnostic.html).  
+The easiest route on an iPhone or iPad is **WiFi** - join the **`OBDII`** network and open **http://11.1.1.1** (see *Connecting to the Dongle* above).
 
 ## What the App Does
 
