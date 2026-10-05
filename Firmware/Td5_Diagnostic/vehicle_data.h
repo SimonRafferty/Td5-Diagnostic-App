@@ -51,10 +51,10 @@ struct VehicleData {
   float    smokeLimitMg;    // smoke limit, mg/stroke
   float    idleDemandMg;    // idle demand, mg/stroke
 
-  // --- Fuel economy (derived; 10-mile rolling window persisted in NVS) ----
+  // --- Fuel economy (derived; 50-mile rolling window persisted in NVS) ----
   float    instMpg;         // instantaneous economy, imperial mpg
-  float    avgMpg;          // last-10-mile average, imperial mpg
-  float    avgL100;         // last-10-mile average, L/100km
+  float    avgMpg;          // last-50-mile average, imperial mpg
+  float    avgL100;         // last-50-mile average, L/100km
   float    tripFuelL;       // total fuel injected since first use, litres
 
   // --- Air / pressures ---------------------------------------------------

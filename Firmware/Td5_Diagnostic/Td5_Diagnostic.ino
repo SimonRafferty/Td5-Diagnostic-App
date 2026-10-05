@@ -200,6 +200,7 @@ void setup() {
   delay(300);
   Serial.println();
   Serial.println(F("=== Td5 Diagnostic (ELM327) - V2 (deep sleep) ==="));
+  Serial.println(F("Firmware version: " FW_VERSION));
 #if DATA_SOURCE_SIM
   Serial.println(F("Data source: SIMULATED (Phase 1 bench)"));
 #else

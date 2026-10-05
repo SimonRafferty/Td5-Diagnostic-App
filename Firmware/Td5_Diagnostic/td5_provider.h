@@ -27,13 +27,14 @@ public:
   void poll() override;
   const VehicleData& data() const override { return _d; }
   int  readDTCs() override;
-  bool clearDTCs() override;
+  ClearResult clearDTCs() override;
+  uint8_t lastClearNrc() const override { return _clearNrc; }
   bool connected() const override { return _d.ecuConnected; }
 
 private:
   Td5Comm     _td5;
   VehicleData _d {};
-  FuelEconomy _fuelEco;   // rolling 10-mile economy, NVS-persisted
+  FuelEconomy _fuelEco;   // rolling 50-mile economy, NVS-persisted
 
   // Demo fallback: if no real ECU has ever answered and we've waited a bit,
   // serve synthetic data so the app/BLE path can be exercised without a vehicle.
@@ -49,7 +50,13 @@ private:
   unsigned long _lastGood     = 0;   // last successful K-line transaction
   unsigned long _connectMs    = 0;   // millis() when the ECU session began
   unsigned long _lastDtcPoll  = 0;   // last fault-code buffer refresh
-  bool          _clearPending = false; // Clear-Codes requested by the app
+  // Clear-Codes handshake between the app/ELM side (clearDTCs) and the K-line
+  // task (pollStep/doClear). Single-byte flags, written by one side each.
+  volatile bool        _clearPending   = false;  // app -> task: send 31 DD
+  volatile bool        _clearAnswered  = false;  // task -> app: _clearResult is valid
+  volatile bool        _clearRefreshed = false;  // task -> app: DTC buffer re-read after the clear
+  volatile ClearResult _clearResult    = ClearResult::NoReply;
+  volatile uint8_t     _clearNrc       = 0;      // ECU negative-response code, if rejected
 
   // The K-line runs in its OWN FreeRTOS task (own core) so blocking K-line I/O
   // never stalls the BLE/OBD side - the app always reads the buffer instantly.

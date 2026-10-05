@@ -17,7 +17,7 @@ public:
   void poll() override;
   const VehicleData& data() const override { return _d; }
   int  readDTCs() override;
-  bool clearDTCs() override;
+  ClearResult clearDTCs() override;
   bool connected() const override { return _d.ecuConnected; }
 
 private:

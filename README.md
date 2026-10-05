@@ -8,6 +8,12 @@ NanoCom from BlackBox Solutions is the go-to for most people, but it's pricey. I
 
 Along with the matching hardware (a K-Line interface + ESP32-S3), it plugs into the Td5 diagnostic socket and emulates an ELM327 scanner. Unlike generic OBD2 apps, the app here also shows the information unique to the Td5, and reads and clears DTCs - completely free and open source.
 
+## Updating your dongle
+
+**[Click here to update your dongle to the latest firmware](https://simonrafferty.github.io/Td5-Diagnostic-App/flash/)**
+
+Open the link in **Google Chrome** or **Microsoft Edge** on a computer, plug the dongle into the computer with a USB-C cable, and click **Install** - the page walks you through it in four simple steps. Updating keeps your stored fuel-economy history. (The version your dongle is running is shown at the bottom of the app.)
+
 ## Connecting to the Dongle
 
 The dongle hosts the whole app itself, so the main way to use it is to open a web page it serves over its own WiFi - there's nothing to install.
@@ -50,7 +56,7 @@ Because this is a debug build it isn't signed for the Play Store, so that "unkno
 There are four simple tabs - swipe left and right to move between them:
 
 - **Fault Codes** - read and clear DTCs, each with a plain-English description of the Td5 fault and a link to look it up online. Once connected it also shows the vehicle's VIN and current fuel-map name (where the ECU provides them).
-- **Available Data** - every parameter the ECU will give you, including the extras unique to the Td5 - injector balance, accelerator tracks, EGR and wastegate, glow-plug and relay states, sensor voltages, idle-speed error and more - plus calculated values like turbo boost and live fuel economy (instantaneous, a rolling 10-mile average, and trip fuel used). Tick what you'd like to see and/or graph, and pick your units.
+- **Available Data** - every parameter the ECU will give you, including the extras unique to the Td5 - injector balance, accelerator tracks, EGR and wastegate, glow-plug and relay states, sensor voltages, idle-speed error and more - plus calculated values like turbo boost and live fuel economy (instantaneous, a rolling 50-mile average (paused while stationary), and trip fuel used). Tick what you'd like to see and/or graph, and pick your units.
 - **Live Data** - your chosen parameters, updating live.
 - **Graphs** - up to four auto-scaling charts so you can watch how things move (boost, temperatures, injector balance and so on).
 
@@ -90,5 +96,7 @@ The dongle is an ESP32-S3 plus a simple K-Line interface (an L9637D transceiver 
 ## Building From Source
 
 **Firmware:** open `Firmware/Td5_Diagnostic/Td5_Diagnostic.ino` in the Arduino IDE, select the **XIAO_ESP32S3** board and upload. You'll need the *EspSoftwareSerial* and *NimBLE-Arduino* libraries (WiFi and DNSServer are built into the ESP32 core). The web app the dongle serves over WiFi is embedded as `webapp_html.h`, already in the repo, so it builds as-is. If you change the app, regenerate that header with `python Firmware/tools/embed_webapp.py` before rebuilding.
+
+**Publishing a firmware update** to the web flasher: run `python Firmware/tools/publish_firmware.py`. It stamps a date-based version into `config.h`, re-embeds the app, compiles against the Arduino IDE's sketchbook libraries and copies the four flash images plus `manifest.json` into `flash/`. Commit and push, and the update page serves the new version about a minute later.
 
 **Android app:** the app is `App/www/index.html` plus a small Bluetooth bridge that lets the native APK reach the phone's Bluetooth stack (an Android WebView has no Web Bluetooth). To rebuild the APK, run `npm install` in the `App` folder, then `npm run sync`, and build with Android Studio (or `gradlew assembleDebug`).

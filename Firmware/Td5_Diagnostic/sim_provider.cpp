@@ -98,8 +98,8 @@ int SimProvider::readDTCs() {
   return _d.dtcCount;
 }
 
-bool SimProvider::clearDTCs() {
+ClearResult SimProvider::clearDTCs() {
   _faultsPresent = false;
   _d.dtcCount = 0;
-  return true;
+  return ClearResult::Ok;
 }

@@ -140,7 +140,7 @@ String Elm327::handleAt(const String& cmd) {
   if (r == "D")              { reset(); return "OK"; }   // set all to defaults
   if (r == "I")              { return ELM_VERSION; }
   if (r == "@1")             { return ELM_DESCRIPTION; }
-  if (r == "@2")             { return "?"; }
+  if (r == "@2")             { return FW_VERSION; }   // our firmware version (app footer)
   if (r == "RV")             { return _obd.batteryVoltageString(); }
 
   // --- Protocol describe -------------------------------------------------

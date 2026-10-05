@@ -112,7 +112,10 @@ Td5Pid pidAmbientPressure(AMBIENT_PRES, 4, 8, 0);
 Td5Pid pidStartFuelling(START_FUELLING, 4, 8);
 Td5Pid pidKeepAlive(KEEP_ALIVE, 4, 3, 1500);  // Keep-alive still needs rate limiting
 Td5Pid pidFaultCodes(FAULT_CODES, 4, 39);
-Td5Pid pidResetFaults(CLEAR_FAULTS, 22, 4);
+// Reply is 4 bytes (02 71 DD cs) on success; 5 leaves room for a negative
+// reply (03 7F 31 nrc cs) so it is read whole and checksums, instead of being
+// truncated into a "lost frame". The length check in getPid() stops at 4 for 71 DD.
+Td5Pid pidResetFaults(CLEAR_FAULTS, 22, 5);
 Td5Pid pidInjectorsBalance(INJ_BALANCE, 4, 14, 0);
 Td5Pid pidVehicleSpeed(VEHICLE_SPEED, 4, 5, 0);
 Td5Pid pidThrottlePosition(THROTTLE_POS, 4, 14, 0);
@@ -238,7 +241,7 @@ void Td5Comm::write_byte(byte b)
   delay(Td5RequestByteDelay);  // ISO requires 5-20 ms delay between bytes (but the TD5 ECU doesn't care so we set it to 1ms)
 }
 
-int8_t Td5Comm::getPid(Td5Pid* pid)
+int8_t Td5Comm::getPid(Td5Pid* pid, uint16_t respTimeoutMs)
 {
   bool gotData = false;
   byte responseIndex = 0;
@@ -271,8 +274,8 @@ int8_t Td5Comm::getPid(Td5Pid* pid)
       read_byte(&fluff); // read in the echoed char of each TX (effectively ignores it). Need to comment this out if not using k-line, as this will break responses on raw uart (sent bytes are not echod back on rx as they ar with k-line)
     }
     
-    // Wait for response for 300 ms
-    long waitResponseTime = currentTime + 300;
+    // Wait for the response (300 ms default, measured from the start of the request)
+    long waitResponseTime = currentTime + respTimeoutMs;
     do
     {
       // If we find any data, keep catching it until it ends
@@ -597,7 +600,12 @@ int Td5Comm::getFaultCode(int index)
 
 int8_t Td5Comm::resetFaults()
 {
-  return getPid(&pidResetFaults);
+  // Request = 14 31 DD + 18 zero bytes (StartRoutine 0xDD), confirmed against
+  // Ekaitza_Itzali / TD5Tester sniff logs of a working tool; the ECU answers
+  // 02 71 DD 50. Its reply has been seen to arrive ~300 ms late, and sending the
+  // 22-byte request itself eats ~70 ms of the window, so the default 300 ms
+  // window could miss a clear the ECU actually performed. Allow 1 s.
+  return getPid(&pidResetFaults, 1000);
 }
 
 

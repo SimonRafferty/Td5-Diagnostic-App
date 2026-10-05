@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Td5 Dongle Update</title>
+<meta name="description" content="Update the Td5 Diagnostic dongle to the latest firmware from your web browser.">
+<!-- ESP Web Tools: the Install button + port picker + progress dialog (Web Serial). -->
+<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+<style>
+  :root{
+    --bg:#f4f5f2; --card:#ffffff; --ink:#1d2320; --ink-2:#4a524d; --line:#dfe3dd;
+    --accent:#2f6b3f; --accent-ink:#ffffff; --warn-bg:#fff6e0; --warn-line:#e8cf8a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#141816; --card:#1d2320; --ink:#eef1ec; --ink-2:#a9b3ac; --line:#2e3631;
+      --accent:#5fae73; --accent-ink:#0d1a11; --warn-bg:#2b2616; --warn-line:#5c4f25;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#141816; --card:#1d2320; --ink:#eef1ec; --ink-2:#a9b3ac; --line:#2e3631;
+    --accent:#5fae73; --accent-ink:#0d1a11; --warn-bg:#2b2616; --warn-line:#5c4f25;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+       font:17px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  main{max-width:640px; margin:0 auto; padding:32px 16px 48px}
+  h1{font-size:28px; line-height:1.2; margin:0 0 6px}
+  .version{color:var(--ink-2); margin:0 0 28px}
+  .version b{color:var(--ink)}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px;
+        padding:22px 22px 8px; margin-bottom:20px}
+  ol{margin:0; padding:0; list-style:none; counter-reset:step}
+  ol li{counter-increment:step; position:relative; padding:0 0 18px 48px}
+  ol li::before{content:counter(step); position:absolute; left:0; top:-2px;
+        width:32px; height:32px; border-radius:50%; background:var(--accent);
+        color:var(--accent-ink); font-weight:700; display:flex;
+        align-items:center; justify-content:center}
+  .install{display:flex; justify-content:center; padding:6px 0 22px}
+  .install button{font:inherit; font-size:20px; font-weight:700; cursor:pointer;
+        background:var(--accent); color:var(--accent-ink); border:0;
+        border-radius:12px; padding:16px 44px}
+  .install button:hover{filter:brightness(1.08)}
+  .notice{background:var(--warn-bg); border:1px solid var(--warn-line);
+        border-radius:12px; padding:14px 16px; font-weight:600; text-align:center}
+  h2{font-size:19px; margin:0 0 12px}
+  ul{margin:0; padding:0 0 14px 20px}
+  ul li{margin-bottom:8px}
+  .muted{color:var(--ink-2); font-size:15px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Update your Td5 dongle</h1>
+  <p class="version" id="version">Latest firmware: checking&hellip;</p>
+
+  <div class="card">
+    <ol>
+      <li>Use <b>Google Chrome</b> or <b>Microsoft Edge</b> on a computer
+          (Windows, Mac or Linux). Phones and tablets can't do this.</li>
+      <li>Unplug the dongle from the car. Connect it to the computer with a
+          <b>USB-C cable</b>.</li>
+      <li>Click the green <b>Install</b> button below. A list pops up: pick the
+          dongle (it may be called <i>"USB JTAG/serial debug unit"</i>) and click
+          <b>Connect</b>, then <b>Install</b>.</li>
+      <li>Wait for <b>"Installation complete"</b> (under a minute). Unplug the cable
+          and plug the dongle back into the car. That's it.</li>
+    </ol>
+
+    <div class="install">
+      <esp-web-install-button manifest="manifest.json">
+        <button slot="activate">Install</button>
+        <div slot="unsupported" class="notice">
+          This browser can't update the dongle. Please open this page in
+          Google Chrome or Microsoft Edge on a computer.
+        </div>
+        <div slot="not-allowed" class="notice">
+          Please open this page from its https:// link.
+        </div>
+      </esp-web-install-button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>If it doesn't work</h2>
+    <ul>
+      <li><b>Nothing appears in the list?</b> Many USB-C cables only charge - try a
+          different cable, or a different USB socket on the computer.</li>
+      <li><b>Still nothing?</b> Unplug the dongle, wait a few seconds, plug it back
+          in and click Install straight away.</li>
+      <li><b>It stopped part-way or showed an error?</b> Just click Install again.
+          It is safe to repeat, and your settings are kept.</li>
+    </ul>
+  </div>
+
+  <p class="muted">Your stored fuel-economy history is kept - updating doesn't erase
+     anything. <a href="../">Back to the Td5 Diagnostic project</a></p>
+</main>
+<script>
+  // Show the version that the Install button will write (from manifest.json).
+  fetch('manifest.json', {cache: 'no-store'})
+    .then(r => r.json())
+    .then(m => {
+      document.getElementById('version').innerHTML =
+        'Latest firmware: <b>version ' + String(m.version).replace(/[<>&]/g, '') + '</b>';
+    })
+    .catch(() => { document.getElementById('version').textContent = ''; });
+</script>
+</body>
+</html>

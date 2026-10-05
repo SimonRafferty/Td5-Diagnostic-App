@@ -36,7 +36,7 @@ bool Td5Provider::begin() {
   _d.ambientKpa   = 101.0f;   // benign defaults until the ECU is polled
   _d.coolantC     = 20.0f;
   _d.batteryMv    = 12600;
-  _fuelEco.begin();           // load the persisted 10-mile economy window from NVS
+  _fuelEco.begin();           // load the persisted 50-mile economy window from NVS
   _td5.init();
   _lastAttempt = 0;
   // Run all K-line I/O in a dedicated task pinned to core 0, so the blocking
@@ -111,7 +111,10 @@ void Td5Provider::pollStep() {
   if (_clearPending) {
     if (doClear()) { _clearPending = false; _lastDtcPoll = 0; }  // then re-read DTCs
   } else if (now - _lastDtcPoll >= 4000) {
-    if (refreshDtcBuffer()) _lastDtcPoll = now;   // advance only on a valid frame
+    if (refreshDtcBuffer()) {                     // advance only on a valid frame
+      _lastDtcPoll = now;
+      _clearRefreshed = true;                     // buffer now reflects any clear
+    }
   } else {
     pollNext();
   }
@@ -425,14 +428,27 @@ int Td5Provider::readDTCs() {
   return _d.dtcCount;          // last value refreshed by poll()/refreshDtcBuffer()
 }
 
-bool Td5Provider::clearDTCs() {
-  // Accept the clear for a live ECU OR the bench/demo source; reject only when
-  // genuinely disconnected. poll() applies it on its next slot: in demo it sets
-  // _demoFaultsCleared (dtcCount -> 0); on the vehicle it sends 31 DD. Returning
-  // true here makes mode 04 answer "44" (accepted), as apps expect.
-  if (!_demoActive && !_td5.ecuIsConnected()) return false;
-  _clearPending = true;        // poll() transmits/applies the clear on its next slot
-  return true;
+ClearResult Td5Provider::clearDTCs() {
+  // Called from the app/ELM side. The K-line task owns the wire, so hand the
+  // clear over and WAIT for the ECU's verdict - previously this returned "44"
+  // as soon as the request was queued, so the app said "cleared" even when the
+  // ECU refused it or never answered.
+  if (!_td5.ecuIsConnected()) return ClearResult::NotConnected;
+
+  _clearAnswered  = false;
+  _clearPending   = true;      // K-line task sends 31 DD on its next slot
+
+  // Answer: an in-flight transaction (<=300 ms) + 55 ms gate + the 1 s clear
+  // window. vTaskDelay keeps this core's idle task fed while we wait.
+  unsigned long t0 = millis();
+  while (!_clearAnswered && millis() - t0 < 2500) vTaskDelay(pdMS_TO_TICKS(10));
+  if (!_clearAnswered) return ClearResult::NoReply;   // ECU dropped / never got a slot
+
+  // Then give the task a moment to re-read the fault list, so the app's next
+  // mode 03 shows what the ECU holds now (faults still present re-log at once).
+  t0 = millis();
+  while (!_clearRefreshed && millis() - t0 < 1000) vTaskDelay(pdMS_TO_TICKS(10));
+  return _clearResult;
 }
 
 // --- K-line-side helpers: called ONLY from poll() (single-task, paced) -------
@@ -470,8 +486,31 @@ bool Td5Provider::refreshDtcBuffer() {
 bool Td5Provider::doClear() {
   int8_t r = _td5.resetFaults();
   if (r == PID_NOT_READY) return false;  // 55 ms gate: not sent, retry next loop
-  if (r > 0) _d.dtcCount = 0;            // positive response -> codes cleared
-  _lastGood = millis();
+
+  ClearResult res;
+  if (r > 0 && pidResetFaults.getResponseByte(1) == 0x71) {
+    res = ClearResult::Ok;               // 02 71 DD 50 - ECU cleared its fault memory
+    _d.dtcCount = 0;
+  } else if (r == PID_NEGATIVE_ANSWER) {
+    _clearNrc = pidResetFaults.getResponseByte(3);
+    // 0x78 = "response pending": the ECU accepted it and is still working, so
+    // it is not a refusal - report as unconfirmed and let the re-read decide.
+    res = (_clearNrc == 0x78) ? ClearResult::NoReply : ClearResult::Rejected;
+  } else {
+    res = ClearResult::NoReply;          // lost/garbled frame
+  }
+  if (r > 0 || r == PID_NEGATIVE_ANSWER) _lastGood = millis();
+
+#if DEBUG_SERIAL
+  Serial.printf("[TD5] clear faults: r=%d reply:", r);
+  for (int i = 0; i < 5; i++) Serial.printf(" %02X", pidResetFaults.getResponseByte(i));
+  Serial.printf("  -> %s\n", res == ClearResult::Ok ? "OK" :
+                res == ClearResult::Rejected ? "REJECTED" : "NO REPLY");
+#endif
+
+  _clearResult    = res;
+  _clearRefreshed = false;               // only a re-read AFTER this point counts
+  _clearAnswered  = true;                // release the waiting clearDTCs()
   return true;                           // frame transmitted -> stop retrying
 }
 

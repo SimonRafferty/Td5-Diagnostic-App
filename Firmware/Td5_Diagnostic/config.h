@@ -69,6 +69,10 @@
 // ELM327 identity (what the emulator reports for ATZ / ATI)
 // ---------------------------------------------------------------------------
 // v1.5 is the safest, most widely-compatible version string for Torque.
+// Firmware release version (date-based). Set by Firmware/tools/publish_firmware.py,
+// which also stamps it into the web flasher's manifest. Reported by AT@2.
+#define FW_VERSION        "2026-10-05"
+
 #define ELM_VERSION       "ELM327 v1.5"
 #define ELM_DESCRIPTION   "OBDII to RS232 Interpreter"
 

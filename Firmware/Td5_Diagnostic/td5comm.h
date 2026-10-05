@@ -74,7 +74,9 @@ public:
   Td5Comm();
   void init();
   void initComm();
-  int8_t getPid(Td5Pid* pid);
+  // respTimeoutMs: how long (from the start of the request) to wait for the reply.
+  // 300 ms suits every live-data PID; the clear-faults routine needs longer.
+  int8_t getPid(Td5Pid* pid, uint16_t respTimeoutMs = 300);
   bool ecuIsConnected();
   bool newDataIsAvailable();
   unsigned long getLastReceivedPidTime();

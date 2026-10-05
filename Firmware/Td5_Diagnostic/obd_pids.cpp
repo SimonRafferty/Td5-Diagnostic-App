@@ -255,9 +255,15 @@ String ObdTranslator::mode03() {
 }
 
 String ObdTranslator::mode04() {
-  // Reflect the real outcome: "44" (positive) only if the clear actually went
-  // through, else NO DATA so the app doesn't falsely report success.
-  return _p.clearDTCs() ? String("44") : String(OBD_NO_DATA);
+  // Reflect the ECU's real verdict (clearDTCs() waits for it):
+  //   44          ECU acknowledged the clear
+  //   7F 04 <nrc> ECU refused it (nrc = the ECU's own negative-response code)
+  //   NO DATA     no ECU session, or no valid answer from the ECU
+  switch (_p.clearDTCs()) {
+    case ClearResult::Ok:       return "44";
+    case ClearResult::Rejected: return "7F 04 " + hx(_p.lastClearNrc());
+    default:                    return OBD_NO_DATA;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -429,13 +435,13 @@ String ObdTranslator::mode22(uint16_t did) {
       appendAscii(body, d.vin, 17);
       return body;
 
-    case 0xF025:  // Avg fuel economy, 10-mile, imperial mpg -> ((A*256)+B)/10
+    case 0xF025:  // Avg fuel economy, 50-mile, imperial mpg -> ((A*256)+B)/10
       appendU16(body, clamp16(lroundf(d.avgMpg * 10.0f)));
       return body;
     case 0xF026:  // Instantaneous fuel economy, imperial mpg -> ((A*256)+B)/10
       appendU16(body, clamp16(lroundf(d.instMpg * 10.0f)));
       return body;
-    case 0xF027:  // Avg fuel economy, 10-mile, L/100km -> ((A*256)+B)/10
+    case 0xF027:  // Avg fuel economy, 50-mile, L/100km -> ((A*256)+B)/10
       appendU16(body, clamp16(lroundf(d.avgL100 * 10.0f)));
       return body;
     case 0xF028:  // Trip fuel used (total injected), litres -> ((A*256)+B)/100
